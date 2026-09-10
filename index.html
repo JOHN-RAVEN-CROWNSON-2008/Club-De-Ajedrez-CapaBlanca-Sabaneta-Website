@@ -18,7 +18,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="assets/img/club-galeria-04.webp">
 <link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/components.css">
 
 <script type="application/ld+json">
 {
@@ -43,6 +45,17 @@
 </script>
 </head>
 <body>
+
+<!-- ==================== PRELOADER ==================== -->
+<div class="preloader" aria-hidden="true">
+  <div class="preloader__inner">
+    <img class="preloader__logo" src="assets/img/logo-capablanca.png" alt="" width="96" height="96">
+    <div class="preloader__bar"><div class="preloader__fill"></div></div>
+    <p class="preloader__txt">Capablanca Sabaneta</p>
+  </div>
+</div>
+<!-- Sin JavaScript el preloader nunca se retiraría y taparía la página. -->
+<noscript><style>.preloader{display:none!important}</style></noscript>
 
 <!-- Barra de progreso de lectura -->
 <div class="progress-track" role="progressbar" aria-label="Progreso de lectura de la página" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -72,7 +85,7 @@
     </nav>
 
     <div class="header__cta">
-      <a class="btn btn--primary btn--sm" href="contacto.html">Inscríbete</a>
+      <a class="btn btn--primary btn--sm pulse" href="contacto.html">Inscríbete</a>
       <button class="burger" type="button" aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
         <span></span><span></span><span></span>
       </button>
@@ -93,13 +106,26 @@
 
 <main id="contenido">
 
-<!-- ==================== HERO ==================== -->
+<!-- ==================== HERO CON SLIDER ==================== -->
 <section class="hero">
-  <div class="hero__bg">
-    <img src="assets/img/club-galeria-04.webp" alt="" fetchpriority="high" width="1440" height="1440">
+  <!-- Slider: 10 fotografías reales del club, rota cada 3 s -->
+  <div class="hero__slider" aria-label="Fotografías del Club Capablanca Sabaneta" role="region">
+    <div class="hero__slide is-active"><img src="assets/img/club-galeria-04.webp" alt="Alumnos y entrenadores del club reunidos frente al mural de ajedrez de la sede" fetchpriority="high" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/delegacion-escalinatas.webp" alt="Delegación completa del club con familias y entrenadores antes de un torneo" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/equipo-infantil-trofeos.webp" alt="Categoría infantil del club posando con sus trofeos tras una premiación" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/campeon-sub8.webp" alt="Alumnos y entrenadores celebrando con el trofeo de Campeón Sub-8" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/equipo-adultos-torneo.webp" alt="Equipo de adultos del club con el uniforme oficial durante un torneo" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/delegacion-coliseo.webp" alt="Deportistas del club en el coliseo durante una jornada de torneo" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/ninos-celebrando.webp" alt="Niños del club celebrando con las manos en alto" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/premiacion-aves-maria.webp" alt="Jugadores del club en la premiación de un torneo en el Parque Comercial Aves María" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/entrenadores-alumno.webp" alt="Dos entrenadores del club acompañando a un alumno con su trofeo" loading="lazy" width="1440" height="1440"></div>
+    <div class="hero__slide"><img src="assets/img/seleccion-colombia.webp" alt="Selección Colombia de ajedrez ante las banderas de los países participantes" loading="lazy" width="1440" height="1440"></div>
   </div>
   <div class="hero__scrim"></div>
   <div class="hero__checker"></div>
+
+  <button class="hero__arrow hero__arrow--prev" type="button" aria-label="Imagen anterior"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <button class="hero__arrow hero__arrow--next" type="button" aria-label="Imagen siguiente"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
 
   <div class="wrap hero__inner">
     <img class="hero__badge" src="assets/img/logo-capablanca.png" alt="Escudo del Club Escuela de Ajedrez Capablanca" width="186" height="192">
@@ -108,11 +134,16 @@
 
     <h1 class="display display--poster hero__title">Formamos campeones dentro y fuera del <em>tablero</em></h1>
 
+    <p class="hero__text" style="font-size:var(--step-2);font-family:var(--ff-banner);text-transform:uppercase;letter-spacing:.04em;margin-bottom:-.4rem">
+      Más de 12 años
+      <span class="typewriter" data-typewriter='["formando deportistas","formando seres humanos íntegros","llevando delegaciones a competir","enseñando a pensar antes de mover"]'></span>
+    </p>
+
     <p class="ribbon">¡Inscripciones abiertas!</p>
 
     <p class="hero__text">
-      Más de <strong>12 años</strong> en Sabaneta formando deportistas y seres humanos íntegros.
       Del primer movimiento al podio, con acompañamiento real en cada partida.
+      Clases presenciales en Sabaneta y online desde donde estés.
     </p>
 
     <ul class="hero__checks">
@@ -128,42 +159,71 @@
     </div>
   </div>
 
+  <div class="hero__dots" role="tablist" aria-label="Seleccionar imagen"></div>
+  <p class="hero__counter" aria-hidden="true"><b>01</b> / <i>10</i></p>
+
   <div class="scroll-cue" aria-hidden="true">
     <span>Descubre</span>
     <span class="scroll-cue__line"></span>
   </div>
 </section>
 
-<!-- ==================== BARRA DE CONFIANZA ==================== -->
-<section class="trust">
-  <div class="wrap trust__grid">
-    <div class="trust__item reveal">
-      <span class="trust__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.1 6.1 20.2l1.2-6.6L2.5 9l6.6-.9z"/></svg></span>
-      <span>
-        <span class="trust__num"><span data-count="12" data-prefix="+">+12</span></span>
-        <span class="trust__label">Años de trayectoria</span>
-      </span>
+<!-- ==================== TICKER ==================== -->
+<div class="ticker" aria-label="Mensajes destacados del club">
+  <div class="ticker__track">
+    <div class="ticker__group">
+      <span class="ticker__item"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.1 6.1 20.2l1.2-6.6L2.5 9l6.6-.9z"/></svg>Inscripciones abiertas</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
+      <span class="ticker__item">Clases para todas las edades</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
+      <span class="ticker__item"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0z"/></svg>Torneos y competiciones</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
+      <span class="ticker__item">Presencial y online</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
+      <span class="ticker__item"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>CC Aves María, Sabaneta</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
+      <span class="ticker__item">+57 300 254 5835</span>
+      <span class="ticker__sep" aria-hidden="true"></span>
     </div>
-    <div class="trust__item reveal" data-delay="1">
-      <span class="trust__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5"/><path d="M16.5 5.5a3.2 3.2 0 010 5.6M18 14.8c2.1.7 3.5 2.4 3.5 5.2"/></svg></span>
-      <span>
-        <span class="trust__num">Todas</span>
-        <span class="trust__label">Las edades, un solo club</span>
-      </span>
+  </div>
+</div>
+
+<!-- ==================== CIFRAS (CONTADORES) ==================== -->
+<section class="section section--dark" style="padding-block:clamp(3rem,2rem + 4vw,5rem)">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <span class="pill pill--gold">El club en cifras</span>
+      <h2 class="display display--gold" style="margin-top:1rem">Doce años que se notan</h2>
     </div>
-    <div class="trust__item reveal" data-delay="2">
-      <span class="trust__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0z"/><path d="M6 6H3.5v1.5A3.5 3.5 0 006 11M18 6h2.5v1.5A3.5 3.5 0 0118 11"/></svg></span>
-      <span>
-        <span class="trust__num">Torneos</span>
-        <span class="trust__label">Competencia real</span>
-      </span>
-    </div>
-    <div class="trust__item reveal" data-delay="3">
-      <span class="trust__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
-      <span>
-        <span class="trust__num">Online</span>
-        <span class="trust__label">Y presencial en Sabaneta</span>
-      </span>
+
+    <div class="stats">
+      <div class="stat reveal" data-anim="zoom">
+        <span class="stat__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></span>
+        <span class="stat__num" data-count="12" data-prefix="+">+12</span>
+        <span class="stat__label">Años de trayectoria</span>
+        <span class="stat__sub">Formando desde el primer movimiento</span>
+      </div>
+
+      <div class="stat reveal" data-anim="zoom" data-delay="1">
+        <span class="stat__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5"/><path d="M16.5 5.5a3.2 3.2 0 010 5.6M18 14.8c2.1.7 3.5 2.4 3.5 5.2"/></svg></span>
+        <span class="stat__num" data-count="1000" data-prefix="+">+1000</span>
+        <span class="stat__label">Deportistas formados</span>
+        <span class="stat__sub">Niños, jóvenes y adultos</span>
+      </div>
+
+      <div class="stat reveal" data-anim="zoom" data-delay="2">
+        <span class="stat__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21h10M8.5 21l.7-4h5.6l.7 4M9 17l-.5-3 2-1.5-1-2.5h5l-1 2.5 2 1.5-.5 3"/></svg></span>
+        <span class="stat__num" data-count="4">4</span>
+        <span class="stat__label">Programas de formación</span>
+        <span class="stat__sub">Infantil, juvenil, adultos y online</span>
+      </div>
+
+      <div class="stat reveal" data-anim="zoom" data-delay="3">
+        <span class="stat__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+        <span class="stat__num" data-count="2">2</span>
+        <span class="stat__label">Modalidades</span>
+        <span class="stat__sub">Presencial en Sabaneta y online</span>
+      </div>
     </div>
   </div>
 </section>
@@ -171,15 +231,15 @@
 <!-- ==================== EL CLUB ==================== -->
 <section class="section">
   <div class="wrap split">
-    <div class="split__media reveal">
+    <div class="split__media reveal" data-anim="left">
       <img src="assets/img/club-galeria-04.webp" alt="Alumnos y entrenadores del Club Capablanca Sabaneta reunidos frente al mural de ajedrez de la sede" loading="lazy" width="1440" height="1440">
       <div class="split__badge">
-        <strong>+12</strong>
+        <strong data-count="12" data-prefix="+">+12</strong>
         <span>Años formando</span>
       </div>
     </div>
 
-    <div class="reveal" data-delay="1">
+    <div class="reveal" data-anim="right" data-delay="1">
       <span class="kicker">Nuestra casa</span>
       <h2 class="display display--ink" style="font-size:var(--step-3)">Un club, una familia sobre 64 casillas</h2>
       <div class="stack" style="margin-top:1.25rem">
@@ -215,7 +275,7 @@
     </div>
 
     <div class="grid grid--4">
-      <article class="jcard reveal">
+      <article class="jcard reveal" data-anim="flip">
         <div class="jcard__top">
           <span class="jcard__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21h10M8.5 21l.7-4h5.6l.7 4M9 17l-.5-3 2-1.5-1-2.5h5l-1 2.5 2 1.5-.5 3"/><path d="M8 5.5V3h2v1.5h4V3h2v2.5"/></svg></span>
           <h3 class="jcard__title">Ajedrez infantil</h3>
@@ -228,10 +288,13 @@
             <li>Atención y memoria</li>
             <li>Juego limpio y respeto</li>
           </ul>
+          <button class="jcard__cta" type="button" data-modal="modal-infantil">
+            Ver detalles <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </article>
 
-      <article class="jcard reveal" data-delay="1">
+      <article class="jcard reveal" data-anim="flip" data-delay="1">
         <div class="jcard__top">
           <span class="jcard__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21h12M7.5 21l1-5h7l1 5M8.5 16l-2-6 3 1.5L12 7l2.5 4.5L17.5 10l-2 6"/></svg></span>
           <h3 class="jcard__title">Formación juvenil</h3>
@@ -244,10 +307,13 @@
             <li>Análisis de partidas</li>
             <li>Preparación de torneos</li>
           </ul>
+          <button class="jcard__cta" type="button" data-modal="modal-juvenil">
+            Ver detalles <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </article>
 
-      <article class="jcard reveal" data-delay="2">
+      <article class="jcard reveal" data-anim="flip" data-delay="2">
         <div class="jcard__top">
           <span class="jcard__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M4.5 20.5c0-4.1 3.4-6.8 7.5-6.8s7.5 2.7 7.5 6.8"/></svg></span>
           <h3 class="jcard__title">Adultos</h3>
@@ -260,10 +326,13 @@
             <li>Ambiente sin presión</li>
             <li>Torneos internos</li>
           </ul>
+          <button class="jcard__cta" type="button" data-modal="modal-adultos">
+            Ver detalles <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </article>
 
-      <article class="jcard reveal" data-delay="3">
+      <article class="jcard reveal" data-anim="flip" data-delay="3">
         <div class="jcard__top">
           <span class="jcard__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
           <h3 class="jcard__title">Clases online</h3>
@@ -276,6 +345,9 @@
             <li>Asesoría personalizada</li>
             <li>Seguimiento del progreso</li>
           </ul>
+          <button class="jcard__cta" type="button" data-modal="modal-online">
+            Ver detalles <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </article>
     </div>
@@ -286,49 +358,148 @@
   </div>
 </section>
 
-<!-- ==================== POR QUÉ EL CLUB ==================== -->
+<!-- ==================== POR QUÉ EL CLUB (FLIP CARDS) ==================== -->
 <section class="section section--dark">
   <div class="wrap">
     <div class="sec-head sec-head--center reveal">
       <span class="pill pill--gold">Por qué Capablanca</span>
       <h2 class="display display--gold" style="margin-top:1rem">Más que clases de ajedrez</h2>
-      <p class="lead">Cuatro cosas que un alumno encuentra aquí y que no siempre encuentra en otra parte.</p>
+      <p class="lead">Pasa el cursor o toca cada tarjeta para ver el detalle.</p>
     </div>
 
     <div class="grid grid--4">
-      <article class="card card--dark card--num reveal">
-        <span class="card__num" aria-hidden="true">01</span>
-        <div class="card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.2v5.3c0 4.3-3.3 7.7-8 8.5-4.7-.8-8-4.2-8-8.5V7.2z"/><path d="M9 12l2 2 4-4.5"/></svg></div>
-        <h3>Método, no improvisación</h3>
-        <p>Cada grupo sigue un plan de trabajo con objetivos claros. El alumno sabe qué está entrenando y por qué.</p>
-      </article>
+      <div class="flip reveal">
+        <div class="flip__inner">
+          <div class="flip__face flip__front">
+            <span class="flip__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.2v5.3c0 4.3-3.3 7.7-8 8.5-4.7-.8-8-4.2-8-8.5V7.2z"/><path d="M9 12l2 2 4-4.5"/></svg></span>
+            <h3>Método, no improvisación</h3>
+            <p class="flip__hint">Ver más</p>
+          </div>
+          <div class="flip__face flip__back">
+            <h3>Método, no improvisación</h3>
+            <p>Cada grupo sigue un plan de trabajo con objetivos por periodo. El alumno sabe qué está entrenando, por qué, y cómo se mide su avance.</p>
+          </div>
+        </div>
+      </div>
 
-      <article class="card card--dark card--num reveal" data-delay="1">
-        <span class="card__num" aria-hidden="true">02</span>
-        <div class="card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0z"/><path d="M6 6H3.5v1.5A3.5 3.5 0 006 11M18 6h2.5v1.5A3.5 3.5 0 0118 11"/></svg></div>
-        <h3>Competencia de verdad</h3>
-        <p>Organizamos torneos y llevamos delegaciones a competir. Entrenar sin competir es solo la mitad del camino.</p>
-      </article>
+      <div class="flip reveal" data-delay="1">
+        <div class="flip__inner">
+          <div class="flip__face flip__front">
+            <span class="flip__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0z"/><path d="M6 6H3.5v1.5A3.5 3.5 0 006 11M18 6h2.5v1.5A3.5 3.5 0 0118 11"/></svg></span>
+            <h3>Competencia de verdad</h3>
+            <p class="flip__hint">Ver más</p>
+          </div>
+          <div class="flip__face flip__back">
+            <h3>Competencia de verdad</h3>
+            <p>Organizamos torneos internos y llevamos delegaciones a competir fuera. Entrenar sin competir es solo la mitad del camino.</p>
+          </div>
+        </div>
+      </div>
 
-      <article class="card card--dark card--num reveal" data-delay="2">
-        <span class="card__num" aria-hidden="true">03</span>
-        <div class="card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
-        <h3>Acompañamiento cercano</h3>
-        <p>Grupos que permiten corregir partida por partida. El entrenador conoce a cada alumno por su nombre y su juego.</p>
-      </article>
+      <div class="flip reveal" data-delay="2">
+        <div class="flip__inner">
+          <div class="flip__face flip__front">
+            <span class="flip__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></span>
+            <h3>Acompañamiento cercano</h3>
+            <p class="flip__hint">Ver más</p>
+          </div>
+          <div class="flip__face flip__back">
+            <h3>Acompañamiento cercano</h3>
+            <p>Grupos que permiten corregir partida por partida. El entrenador conoce a cada alumno por su nombre y por su forma de jugar.</p>
+          </div>
+        </div>
+      </div>
 
-      <article class="card card--dark card--num reveal" data-delay="3">
-        <span class="card__num" aria-hidden="true">04</span>
-        <div class="card__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-9.8A4.2 4.2 0 0112 8.4a4.2 4.2 0 017.5 2.3c0 5.2-7.5 9.8-7.5 9.8z"/></svg></div>
-        <h3>Valores sobre resultados</h3>
-        <p>Puntualidad, respeto al rival y honestidad. Los trofeos se guardan; el carácter se lo lleva puesto toda la vida.</p>
-      </article>
+      <div class="flip reveal" data-delay="3">
+        <div class="flip__inner">
+          <div class="flip__face flip__front">
+            <span class="flip__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-9.8A4.2 4.2 0 0112 8.4a4.2 4.2 0 017.5 2.3c0 5.2-7.5 9.8-7.5 9.8z"/></svg></span>
+            <h3>Valores sobre resultados</h3>
+            <p class="flip__hint">Ver más</p>
+          </div>
+          <div class="flip__face flip__back">
+            <h3>Valores sobre resultados</h3>
+            <p>Puntualidad, respeto al rival y honestidad. Los trofeos se guardan; el carácter se lo lleva puesto toda la vida.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barras de habilidad -->
+    <div class="split" style="margin-top:clamp(3rem,5vw,5rem)">
+      <div class="reveal" data-anim="left">
+        <span class="kicker">Qué entrena el ajedrez</span>
+        <h2 class="display display--gold" style="font-size:var(--step-3)">Habilidades que se llevan fuera del tablero</h2>
+        <p class="lead" style="margin-top:1rem">
+          El ajedrez no solo enseña a jugar ajedrez. Estas son las capacidades que más
+          vemos crecer en nuestros alumnos a lo largo de un año de formación.
+        </p>
+      </div>
+      <div class="skills reveal" data-anim="right" data-delay="1">
+        <div class="skill">
+          <div class="skill__head"><span class="skill__name">Concentración sostenida</span><span class="skill__pct">0%</span></div>
+          <div class="skill__track"><div class="skill__fill" data-pct="95"></div></div>
+        </div>
+        <div class="skill">
+          <div class="skill__head"><span class="skill__name">Pensamiento estratégico</span><span class="skill__pct">0%</span></div>
+          <div class="skill__track"><div class="skill__fill" data-pct="92"></div></div>
+        </div>
+        <div class="skill">
+          <div class="skill__head"><span class="skill__name">Tolerancia a la frustración</span><span class="skill__pct">0%</span></div>
+          <div class="skill__track"><div class="skill__fill" data-pct="88"></div></div>
+        </div>
+        <div class="skill">
+          <div class="skill__head"><span class="skill__name">Memoria y cálculo</span><span class="skill__pct">0%</span></div>
+          <div class="skill__track"><div class="skill__fill" data-pct="90"></div></div>
+        </div>
+        <div class="skill">
+          <div class="skill__head"><span class="skill__name">Toma de decisiones bajo presión</span><span class="skill__pct">0%</span></div>
+          <div class="skill__track"><div class="skill__fill" data-pct="86"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FLYER ==================== -->
+<section class="section">
+  <div class="wrap split">
+    <div class="reveal" data-anim="left">
+      <span class="kicker">Nuestra convocatoria</span>
+      <h2 class="display display--ink" style="font-size:var(--step-3)">Inscripciones abiertas todo el año</h2>
+      <div class="stack" style="margin-top:1.25rem">
+        <p class="lead">Este es el aviso oficial del club. Toda la información de contacto que necesitas está ahí.</p>
+        <ul class="stack" style="margin-top:1.25rem">
+          <li class="check check--light"><span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span><b>Clases</b> para todas las edades.</span></li>
+          <li class="check check--light"><span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span><b>Torneos</b> y competiciones.</span></li>
+          <li class="check check--light"><span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span><b>Entrenamiento</b> y asesoría.</span></li>
+          <li class="check check--light"><span class="check__box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span><b>Modalidad</b> presencial y online.</span></li>
+        </ul>
+      </div>
+      <div class="btn-row" style="margin-top:1.75rem">
+        <a class="btn btn--wa" href="https://wa.me/573002545835?text=Hola%2C%20quiero%20inscribirme%20en%20el%20Club%20de%20Ajedrez%20Capablanca%20Sabaneta." target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 00-8.6 15l-1.3 4.8 5-1.3A10 10 0 1012 2zm5.8 14.2c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.8-.6-3.1-1.3-5.1-4.4-5.3-4.6-.1-.2-1.2-1.6-1.2-3s.7-2.1 1-2.4c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .7.5l.9 2.2c.1.2.1.4 0 .6l-.4.5-.3.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.7-.1l1-1.2c.2-.2.4-.2.6-.1l2.1 1c.3.1.5.2.5.4 0 .1 0 .7-.2 1.3z"/></svg>
+          +57 300 254 5835
+        </a>
+      </div>
+    </div>
+
+    <!-- Contenedor que muestra el flyer completo, sin recortes -->
+    <div class="flyer reveal" data-anim="right" data-delay="1">
+      <span class="flyer__tag">Oficial</span>
+      <img class="flyer__img" src="assets/img/flyer-inscripciones.webp"
+           alt="Aviso oficial del Club Deportivo de Ajedrez Capablanca Sabaneta: inscripciones abiertas, más de 12 años formando deportistas, clases para todas las edades, torneos y competiciones, entrenamiento y asesoría, modalidad presencial y online. Teléfono +57 300 254 5835, CC Aves María tercer piso, Sabaneta, Antioquia."
+           loading="lazy" width="1080" height="1440"
+           data-lightbox="assets/img/flyer-inscripciones.webp"
+           data-cap="Convocatoria oficial del club"
+           data-alt="Aviso oficial de inscripciones abiertas del Club Capablanca Sabaneta">
+      <p class="flyer__hint">Toca la imagen para ampliarla</p>
     </div>
   </div>
 </section>
 
 <!-- ==================== GALERÍA ==================== -->
-<section class="section">
+<section class="section section--soft">
   <div class="wrap">
     <div class="sec-head sec-head--center reveal">
       <span class="kicker kicker--center">El club en fotos</span>
@@ -348,6 +519,26 @@
       </button>
 
       <button class="gitem reveal" data-delay="1" type="button"
+        data-lightbox="assets/img/campeon-sub8.webp"
+        data-cap="Campeón Sub-8"
+        data-alt="Alumnos y entrenadores celebrando con el trofeo de Campeón Sub-8"
+        aria-label="Ampliar: Campeón Sub-8">
+        <img src="assets/img/campeon-sub8.webp" alt="Alumnos y entrenadores celebrando con el trofeo de Campeón Sub-8" loading="lazy" width="1440" height="1440">
+        <span class="gitem__zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg></span>
+        <span class="gitem__cap">Campeón Sub-8</span>
+      </button>
+
+      <button class="gitem reveal" data-delay="2" type="button"
+        data-lightbox="assets/img/delegacion-escalinatas.webp"
+        data-cap="Delegación completa"
+        data-alt="Delegación completa del club con familias y entrenadores antes de un torneo"
+        aria-label="Ampliar: delegación completa">
+        <img src="assets/img/delegacion-escalinatas.webp" alt="Delegación completa del club con familias y entrenadores antes de un torneo" loading="lazy" width="1440" height="1440">
+        <span class="gitem__zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg></span>
+        <span class="gitem__cap">Delegación completa</span>
+      </button>
+
+      <button class="gitem reveal" data-delay="3" type="button"
         data-lightbox="assets/img/equipo-adultos-torneo.webp"
         data-cap="Equipo de adultos en competencia"
         data-alt="Equipo de adultos del club con el uniforme oficial durante un torneo"
@@ -356,31 +547,52 @@
         <span class="gitem__zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg></span>
         <span class="gitem__cap">Equipo de adultos</span>
       </button>
-
-      <button class="gitem reveal" data-delay="2" type="button"
-        data-lightbox="assets/img/entrenadores-alumno.webp"
-        data-cap="Acompañamiento personalizado"
-        data-alt="Dos entrenadores del club acompañando a un alumno que sostiene su trofeo"
-        aria-label="Ampliar: acompañamiento personalizado">
-        <img src="assets/img/entrenadores-alumno.webp" alt="Dos entrenadores del club acompañando a un alumno que sostiene su trofeo" loading="lazy" width="1440" height="1440">
-        <span class="gitem__zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg></span>
-        <span class="gitem__cap">Entrenadores y alumno</span>
-      </button>
-
-      <button class="gitem reveal" data-delay="3" type="button"
-        data-lightbox="assets/img/club-galeria-04.webp"
-        data-cap="Delegación del club"
-        data-alt="Delegación completa del club frente al mural de ajedrez de la sede"
-        aria-label="Ampliar: delegación del club">
-        <img src="assets/img/club-galeria-04.webp" alt="Delegación completa del club frente al mural de ajedrez de la sede" loading="lazy" width="1440" height="1440">
-        <span class="gitem__zoom" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg></span>
-        <span class="gitem__cap">Nuestra delegación</span>
-      </button>
     </div>
 
     <div class="btn-row btn-row--center" style="margin-top:2.5rem">
       <a class="btn btn--ghost-ink" href="galeria.html">Ver todas las fotos</a>
     </div>
+  </div>
+</section>
+
+<!-- ==================== MURO SOCIAL ==================== -->
+<section class="section section--dark">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <span class="pill pill--gold">Redes sociales</span>
+      <h2 class="display display--gold" style="margin-top:1rem">Conecta con nuestra familia Capablanca en nuestras redes sociales</h2>
+      <p class="lead">Publicaciones destacadas y lo último del club. Síguenos para no perderte convocatorias, resultados y momentos de la escuela.</p>
+    </div>
+
+    <div class="igprofile reveal">
+      <span class="igprofile__av"><img src="assets/img/logo-capablanca.png" alt="" width="74" height="74"></span>
+      <span class="igprofile__info">
+        <span class="igprofile__name">Club de Ajedrez Capablanca</span>
+        <span class="igprofile__handle">@capablanca_sabaneta</span>
+        <span class="igprofile__desc">Club Deportivo de Ajedrez · Sabaneta, Antioquia · Más de 12 años formando deportistas</span>
+      </span>
+      <a class="btn btn--primary btn--sm" href="https://www.instagram.com/capablanca_sabaneta/" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.3 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .3-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.3-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.3 2.2-.4 1.3-.1 1.7-.1 4.8-.1zm0 3.4a6.4 6.4 0 100 12.8 6.4 6.4 0 000-12.8zm0 10.5a4.1 4.1 0 110-8.2 4.1 4.1 0 010 8.2zm8.2-10.8a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/></svg>
+        Seguir
+      </a>
+    </div>
+
+    <div class="social-wall" id="social-wall"></div>
+
+    <div class="btn-row btn-row--center" style="margin-top:2.5rem">
+      <a class="btn btn--ghost" href="https://www.instagram.com/capablanca_sabaneta/" target="_blank" rel="noopener">Ver todo en Instagram</a>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== TESTIMONIOS ==================== -->
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <span class="kicker kicker--center">Lo que dicen</span>
+      <h2 class="display display--ink">Familias que ya juegan con nosotros</h2>
+    </div>
+    <div class="grid grid--3" id="testimonios"></div>
   </div>
 </section>
 
@@ -402,32 +614,68 @@
   </div>
 </section>
 
-<!-- ==================== UBICACIÓN ==================== -->
+<!-- ==================== UBICACIÓN + MAPA ==================== -->
 <section class="section section--dark">
-  <div class="wrap split split--reverse">
-    <div class="split__media reveal">
-      <img src="assets/img/flyer-inscripciones.webp" alt="Pieza gráfica oficial del club anunciando inscripciones abiertas, con datos de contacto y sede" loading="lazy" width="1080" height="1440">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <span class="kicker kicker--center">Dónde estamos</span>
+      <h2 class="display display--gold">Sabaneta, Antioquia</h2>
+      <p class="lead">Centro Comercial Aves María, tercer piso. Fácil de llegar en metro y a pocos minutos del parque principal.</p>
     </div>
-    <div class="reveal" data-delay="1">
-      <span class="kicker">Dónde estamos</span>
-      <h2 class="display display--gold" style="font-size:var(--step-3)">Sabaneta, Antioquia</h2>
-      <p class="lead" style="margin-top:1rem">
-        Nuestra sede queda en el <strong>Centro Comercial Aves María, tercer piso</strong>.
-        Fácil de llegar en metro y a pocos minutos del parque principal.
-      </p>
-      <ul class="footer__contact stack" style="margin-top:1.75rem">
-        <li>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
-          <span>CC Aves María, tercer piso<br>Sabaneta, Antioquia, Colombia</span>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
-          <span>+57 300 254 5835</span>
-        </li>
-      </ul>
-      <div class="btn-row" style="margin-top:1.75rem">
-        <a class="btn btn--primary" href="https://www.google.com/maps/search/?api=1&amp;query=Centro+Comercial+Aves+Maria+Sabaneta+Antioquia" target="_blank" rel="noopener">Ver en el mapa</a>
-        <a class="btn btn--ghost" href="contacto.html">Contáctanos</a>
+
+    <div class="split" style="align-items:stretch">
+      <div class="reveal" data-anim="left">
+        <div class="map">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d294.8388272528983!2d-75.61803483888748!3d6.149147616430133!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4683de5c52fae7%3A0x48c5e1c8db55276c!2sAves%20Mar%C3%ADa%20Parque%20Comercial%20P.%20H!5e0!3m2!1ses!2sco!4v1789078462103!5m2!1ses!2sco"
+            title="Ubicación del Club de Ajedrez Capablanca Sabaneta en el Parque Comercial Aves María"
+            allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          <p class="map__pin">
+            <strong>Club Capablanca Sabaneta</strong>
+            <span>CC Aves María, tercer piso · Sabaneta, Antioquia</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="reveal" data-anim="right" data-delay="1">
+        <div class="stack">
+          <div class="iconbox">
+            <span class="iconbox__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+            <div>
+              <h3>Nuestra sede</h3>
+              <p>Centro Comercial Aves María, tercer piso.<br>Sabaneta, Antioquia, Colombia.</p>
+            </div>
+          </div>
+
+          <div class="iconbox">
+            <span class="iconbox__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg></span>
+            <div>
+              <h3>Teléfono y WhatsApp</h3>
+              <p>+57 300 254 5835</p>
+            </div>
+          </div>
+
+          <div class="iconbox">
+            <span class="iconbox__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+            <div>
+              <h3>¿Vives lejos?</h3>
+              <p>También dictamos clases y asesorías en modalidad online, con la misma metodología del club.</p>
+            </div>
+          </div>
+
+          <div class="iconbox">
+            <span class="iconbox__ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></span>
+            <div>
+              <h3>Horarios</h3>
+              <p>Tenemos grupos en distintos días y jornadas según la edad y el nivel. Confirmamos la disponibilidad actual por WhatsApp.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:1.75rem">
+          <a class="btn btn--primary" href="https://www.google.com/maps/search/?api=1&amp;query=Centro+Comercial+Aves+Maria+Sabaneta+Antioquia" target="_blank" rel="noopener">Cómo llegar</a>
+          <a class="btn btn--ghost" href="contacto.html">Contáctanos</a>
+        </div>
       </div>
     </div>
   </div>
@@ -523,7 +771,94 @@
   </figure>
 </div>
 
+<!-- Modal -->
+<div class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Detalle del programa">
+  <div class="modal__box"></div>
+</div>
+
+<!-- Plantillas de los modales de programa -->
+<template id="modal-infantil">
+  <div class="modal__head"><h3>Ajedrez infantil</h3><p>Primeros movimientos</p></div>
+  <div class="modal__body">
+    <p>El objetivo de esta etapa no es formar competidores, es que el niño se enamore del juego. Trabajamos con dinámicas, retos cortos y mucha práctica guiada.</p>
+    <h4>Qué aprende</h4>
+    <ul class="modal__list">
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Movimiento y valor de cada pieza</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Jaque, jaque mate y tablas</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Mates elementales y primeras tácticas</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Normas de juego limpio y respeto al rival</span></li>
+    </ul>
+    <h4>Además desarrolla</h4>
+    <p>Atención sostenida, memoria de trabajo, control de impulsos y tolerancia a la frustración: los beneficios que las familias notan primero en casa y en el colegio.</p>
+  </div>
+  <div class="modal__foot">
+    <a class="btn btn--wa btn--sm" href="https://wa.me/573002545835?text=Hola%2C%20quiero%20informaci%C3%B3n%20del%20programa%20de%20ajedrez%20infantil." target="_blank" rel="noopener">Consultar por WhatsApp</a>
+    <a class="btn btn--ghost btn--sm" href="programas.html">Ver programa completo</a>
+  </div>
+</template>
+
+<template id="modal-juvenil">
+  <div class="modal__head"><h3>Formación juvenil</h3><p>Ruta competitiva</p></div>
+  <div class="modal__body">
+    <p>La etapa en la que el alumno deja de improvisar y empieza a jugar con plan. Estudio estructurado, participación en torneos y análisis sistemático de las propias partidas.</p>
+    <h4>Contenidos</h4>
+    <ul class="modal__list">
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Repertorio de aperturas acorde al estilo</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Táctica avanzada y cálculo de variantes</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Finales fundamentales de torre y peones</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Manejo del reloj y preparación mental</span></li>
+    </ul>
+    <h4>Competencia</h4>
+    <p>Los alumnos de este grupo viajan con la delegación del club. Antes de cada torneo se entrena el formato específico, y al terminar se analizan las partidas una por una.</p>
+  </div>
+  <div class="modal__foot">
+    <a class="btn btn--wa btn--sm" href="https://wa.me/573002545835?text=Hola%2C%20quiero%20informaci%C3%B3n%20del%20programa%20de%20formaci%C3%B3n%20juvenil." target="_blank" rel="noopener">Consultar por WhatsApp</a>
+    <a class="btn btn--ghost btn--sm" href="torneos.html">Ver torneos</a>
+  </div>
+</template>
+
+<template id="modal-adultos">
+  <div class="modal__head"><h3>Adultos</h3><p>Nunca es tarde</p></div>
+  <div class="modal__body">
+    <p>Uno de los grupos que más crece. Reúne a quien nunca aprendió, a quien jugaba de niño y quiere retomar, y al aficionado que lleva años estancado en el mismo nivel.</p>
+    <h4>Cómo trabajamos</h4>
+    <ul class="modal__list">
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Diagnóstico inicial para ubicarte en el grupo correcto</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Corrección de vicios adquiridos jugando solo</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Principios posicionales y estructura de peones</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Torneos internos sin presión de resultado</span></li>
+    </ul>
+    <h4>El ambiente</h4>
+    <p>Sin exámenes ni rankings obligatorios. Se viene a jugar, a mejorar y a compartir con gente que disfruta lo mismo.</p>
+  </div>
+  <div class="modal__foot">
+    <a class="btn btn--wa btn--sm" href="https://wa.me/573002545835?text=Hola%2C%20quiero%20informaci%C3%B3n%20del%20grupo%20de%20adultos." target="_blank" rel="noopener">Consultar por WhatsApp</a>
+    <a class="btn btn--ghost btn--sm" href="programas.html">Ver programa completo</a>
+  </div>
+</template>
+
+<template id="modal-online">
+  <div class="modal__head"><h3>Clases online</h3><p>Desde donde estés</p></div>
+  <div class="modal__body">
+    <p>La misma metodología del club por videollamada, con tablero compartido en pantalla y ejercicios enviados para practicar entre sesiones.</p>
+    <h4>Para quién es</h4>
+    <ul class="modal__list">
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Quien vive lejos de Sabaneta</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Quien necesita horarios flexibles</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Alumnos que viajan y no quieren perder el ritmo</span></li>
+      <li><svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Quien busca asesoría individual intensiva</span></li>
+    </ul>
+    <h4>Qué incluye</h4>
+    <p>Clases individuales o en grupo reducido, análisis de tus partidas online y seguimiento del progreso sesión a sesión.</p>
+  </div>
+  <div class="modal__foot">
+    <a class="btn btn--wa btn--sm" href="https://wa.me/573002545835?text=Hola%2C%20quiero%20informaci%C3%B3n%20de%20las%20clases%20online." target="_blank" rel="noopener">Consultar por WhatsApp</a>
+    <a class="btn btn--ghost btn--sm" href="programas.html">Ver programa completo</a>
+  </div>
+</template>
+
 <script src="assets/js/data.js"></script>
 <script src="assets/js/main.js"></script>
+<script src="assets/js/components.js"></script>
 </body>
 </html>

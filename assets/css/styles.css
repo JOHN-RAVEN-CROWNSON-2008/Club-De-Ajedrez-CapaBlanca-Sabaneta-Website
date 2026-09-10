@@ -438,7 +438,9 @@ body.no-scroll{overflow:hidden}
   .split{grid-template-columns:1fr 1fr}
   .split--reverse .split__media{order:2}
 }
-.split__media{position:relative}
+/* isolation crea un contexto de apilamiento propio: sin él, el marco dorado
+   (z-index:-1) se pintaría por detrás del fondo de la sección y desaparecería. */
+.split__media{position:relative;isolation:isolate}
 .split__media img{
   width:100%;border-radius:var(--r-lg);box-shadow:var(--shadow-md);
   aspect-ratio:4/3;object-fit:cover;

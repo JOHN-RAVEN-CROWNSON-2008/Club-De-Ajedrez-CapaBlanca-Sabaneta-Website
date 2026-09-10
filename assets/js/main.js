@@ -210,6 +210,15 @@
 
     triggers.forEach(function (t, i) {
       t.addEventListener('click', function () { open(i); });
+      // Algunos disparadores no son <button> (p. ej. la imagen del flyer):
+      // se les da rol y foco para que también funcionen con teclado.
+      if (t.tagName !== 'BUTTON' && t.tagName !== 'A') {
+        t.setAttribute('role', 'button');
+        if (!t.hasAttribute('tabindex')) t.tabIndex = 0;
+        t.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(i); }
+        });
+      }
     });
     $('.lightbox__close', box).addEventListener('click', close);
     $('.lightbox__prev', box).addEventListener('click', function () { show(index - 1); });
@@ -387,6 +396,15 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+
+  /* ---------- API pública ----------
+     components.js inyecta tarjetas (muro social) después del
+     arranque y necesita volver a registrar las animaciones de
+     entrada sobre ese marcado nuevo. */
+  window.CAPA = {
+    refreshReveal: initReveal,
+    refreshAccordion: initAccordion
+  };
 
   /* ---------- Arranque ---------- */
   function boot() {
