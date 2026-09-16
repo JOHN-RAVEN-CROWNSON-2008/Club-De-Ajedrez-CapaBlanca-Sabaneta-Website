@@ -83,23 +83,42 @@ export const ContactView: React.FC = () => {
             </h2>
 
             {submitted ? (
-              <div style={{ background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '12px', padding: '2rem', textAlign: 'center' }}>
-                <CheckCircle2 size={48} color="#2e7d32" style={{ margin: '0 auto 1rem' }} />
-                <h3 style={{ color: '#2e7d32', marginBottom: '0.5rem' }}>¡Mensaje enviado con éxito!</h3>
-                <p style={{ color: '#444' }}>
-                  Nos pondremos en contacto contigo a la brevedad a través de correo o WhatsApp.
+              <div style={{ background: '#e8f5e9', border: '1px solid #c8e6c9', borderRadius: '12px', padding: '2.5rem 2rem', textAlign: 'center' }}>
+                <CheckCircle2 size={52} color="#2e7d32" style={{ margin: '0 auto 1rem' }} />
+                <h3 style={{ color: '#2e7d32', fontSize: '1.4rem', marginBottom: '0.5rem' }}>¡Mensaje enviado con éxito!</h3>
+                <p style={{ color: '#444', lineHeight: 1.6, maxWidth: '460px', margin: '0 auto' }}>
+                  Hemos recibido tu solicitud sobre <strong>{formData.subject}</strong>. Nos pondremos en contacto contigo a la mayor brevedad a través de correo o WhatsApp.
                 </p>
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  style={{ marginTop: '1.5rem' }}
-                  onClick={() => {
-                    setSubmitted(false);
-                    setFormData({ name: '', email: '', phone: '', subject: 'Inscripción a Clases', message: '' });
-                  }}
-                >
-                  Enviar otro mensaje
-                </button>
+                <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1.8rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => whatsappService.openChat(`Hola Club Capablanca, acabo de enviar una consulta desde la web sobre: ${formData.subject}. Mi nombre es ${formData.name}.`)}
+                    className="btn"
+                    style={{
+                      background: '#25D366',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontWeight: 600,
+                      padding: '0.6rem 1.2rem',
+                    }}
+                  >
+                    <MessageCircle size={18} />
+                    <span>Confirmar por WhatsApp</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    style={{ padding: '0.6rem 1.2rem' }}
+                    onClick={() => {
+                      setSubmitted(false);
+                      setFormData({ name: '', email: '', phone: '', subject: 'Inscripción a Clases', message: '' });
+                    }}
+                  >
+                    Enviar otro mensaje
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
