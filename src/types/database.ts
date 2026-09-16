@@ -186,4 +186,21 @@ export interface ClassAttendance {
   created_at?: string;
 }
 
+export type TrophyType = 'champion' | 'runner_up' | 'third_place' | 'team_medal';
+
+export interface ClubTrophy {
+  id: string;
+  title: string;
+  year: number;
+  category: string;
+  champion_name: string;
+  runner_up?: string;
+  trophy_type: TrophyType;
+  edition?: string;
+  location?: string;
+  notes?: string;
+  created_at?: string;
+}
+
+
 

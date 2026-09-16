@@ -292,7 +292,24 @@ CREATE TABLE IF NOT EXISTS public.class_attendance (
 );
 
 -- ==============================================================================
--- 16. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
+-- 16. TABLA: club_trophies (Cuadro de Honor, Campeones Históricos y Palmarés)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.club_trophies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    champion_name TEXT NOT NULL,
+    runner_up TEXT,
+    trophy_type TEXT NOT NULL DEFAULT 'champion' CHECK (trophy_type IN ('champion', 'runner_up', 'third_place', 'team_medal')),
+    edition TEXT,
+    location TEXT DEFAULT 'Sabaneta, Antioquia',
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 17. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
@@ -307,6 +324,7 @@ ALTER TABLE public.class_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.club_trophies ENABLE ROW LEVEL SECURITY;
 
 
 -- ==============================================================================
@@ -412,8 +430,15 @@ CREATE POLICY "Asistencia lectura miembros y admin" ON public.class_attendance F
 DROP POLICY IF EXISTS "Admins gestionan asistencia" ON public.class_attendance;
 CREATE POLICY "Admins gestionan asistencia" ON public.class_attendance FOR ALL USING (public.is_admin());
 
+-- Club Trophies (Palmarés y Cuadro de Honor)
+DROP POLICY IF EXISTS "Trofeos lectura publica" ON public.club_trophies;
+CREATE POLICY "Trofeos lectura publica" ON public.club_trophies FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "Admins gestionan trofeos" ON public.club_trophies;
+CREATE POLICY "Admins gestionan trofeos" ON public.club_trophies FOR ALL USING (public.is_admin());
+
 -- ==============================================================================
--- 17. SEED DATA (DATOS INICIALES COMPLETOS)
+-- 18. SEED DATA (DATOS INICIALES COMPLETOS)
 -- ==============================================================================
 
 
@@ -467,4 +492,15 @@ VALUES
 ('Mateo Valencia', CURRENT_DATE, 'excused', 'Permiso médico presentado ante el cuerpo técnico'),
 ('Valentina Restrepo', CURRENT_DATE, 'present', 'Gran desempeño en partidas de práctica a 15 min')
 ON CONFLICT DO NOTHING;
+
+-- Registro Histórico de Campeones y Trofeos (Palmarés)
+INSERT INTO public.club_trophies (title, year, category, champion_name, runner_up, trophy_type, edition, location, notes)
+VALUES
+('Torneo Abierto de Ajedrez Rápido Fiestas de Sabaneta', 2025, 'Categoría Abierta', 'Santiago Gómez', 'Andrés Arboleda', 'champion', 'XII Edición Anual', 'CC Aves María, Sabaneta', 'Gran final decidida en desempate Armagedón con invicto en 7 rondas.'),
+('Festival Departamental de Semilleros Sub-12', 2025, 'Semillero Infantil Sub-12', 'Valentina Restrepo', 'David Rendón', 'champion', 'Fase Valle de Aburrá', 'Liga de Ajedrez de Antioquia, Medellín', 'Puntaje perfecto de 6 puntos en 6 rondas, obteniendo cupo al Nacional.'),
+('Campeonato Departamental de Blitz Relámpago', 2024, 'Categoría Blitz 3+2', 'Mateo Valencia', 'Carlos Mario Peña', 'champion', 'Edición Departamental 2024', 'Sabaneta, Antioquia', 'Notable actuación con un performance rating superior a 2100 Elo.'),
+('Copa Interclubes del Sur del Valle de Aburrá', 2024, 'Torneo por Equipos Mayores', 'Equipo Capablanca Sabaneta Élite', 'Club de Ajedrez Envigado', 'team_medal', 'Copa Confraternidad 2024', 'Sede CC Aves María', 'Victoria por equipos 3.5 a 0.5 en la ronda final decisiva.'),
+('Torneo Juvenil San Juan Bautista de Sabaneta', 2023, 'Juvenil Sub-16', 'Santiago Gómez', 'Mateo Valencia', 'champion', 'Edición Tradicional 2023', 'Parque Principal de Sabaneta', 'Torneo al aire libre con más de 48 deportistas del municipio.')
+ON CONFLICT DO NOTHING;
+
 

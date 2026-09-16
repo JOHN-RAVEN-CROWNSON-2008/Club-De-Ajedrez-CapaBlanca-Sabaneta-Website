@@ -6,19 +6,20 @@ import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
   INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS,
-  INITIAL_ATTENDANCE
+  INITIAL_ATTENDANCE, INITIAL_TROPHIES
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
-  GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus
+  GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus,
+  ClubTrophy, TrophyType
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList
+  UserCheck, UserX, ClipboardList, Crown
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -48,6 +49,20 @@ export const AdminDashboardView: React.FC = () => {
   const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [scheduleSubTab, setScheduleSubTab] = useState<'schedules' | 'attendance'>('schedules');
   const [quickAttendeeName, setQuickAttendeeName] = useState<string>('');
+  const [trophies, setTrophies] = useState<ClubTrophy[]>(INITIAL_TROPHIES);
+  const [showTrophyModal, setShowTrophyModal] = useState<boolean>(false);
+  const [newTrophy, setNewTrophy] = useState({
+    title: '',
+    year: new Date().getFullYear(),
+    category: 'Categoría Abierta',
+    champion_name: '',
+    runner_up: '',
+    trophy_type: 'champion' as TrophyType,
+    edition: 'Edición Oficial',
+    location: 'CC Aves María, Sabaneta',
+    notes: '',
+  });
+  const [eventsSubTab, setEventsSubTab] = useState<'tournaments' | 'matches' | 'roster' | 'trophies'>('tournaments');
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
   const [messages, setMessages] = useState<ContactMessage[]>([
     {
@@ -175,6 +190,9 @@ export const AdminDashboardView: React.FC = () => {
         const { data: atts } = await supabase.from('class_attendance').select('*').order('session_date', { ascending: false });
         if (atts && atts.length > 0) setAttendance(atts as ClassAttendance[]);
 
+        const { data: trData } = await supabase.from('club_trophies').select('*').order('year', { ascending: false });
+        if (trData && trData.length > 0) setTrophies(trData as ClubTrophy[]);
+
         const { data: anns } = await supabase.from('club_announcements').select('*');
         if (anns && anns.length > 0) setAnnouncements(anns as ClubAnnouncement[]);
 
@@ -289,6 +307,59 @@ export const AdminDashboardView: React.FC = () => {
     }
     setMatches(matches.filter((m) => m.id !== id));
     triggerNotice('Partida eliminada');
+  };
+
+  // Palmarés y Cuadro de Honor Histórico
+  const handleCreateTrophy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const item: ClubTrophy = {
+      id: 'tr-' + Date.now(),
+      title: newTrophy.title,
+      year: Number(newTrophy.year),
+      category: newTrophy.category,
+      champion_name: newTrophy.champion_name,
+      runner_up: newTrophy.runner_up || undefined,
+      trophy_type: newTrophy.trophy_type,
+      edition: newTrophy.edition || undefined,
+      location: newTrophy.location || undefined,
+      notes: newTrophy.notes || undefined,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('club_trophies').insert(item);
+      } catch (err) {
+        console.error('Error al guardar título en Supabase:', err);
+      }
+    }
+
+    setTrophies([item, ...trophies]);
+    setShowTrophyModal(false);
+    setNewTrophy({
+      title: '',
+      year: new Date().getFullYear(),
+      category: 'Categoría Abierta',
+      champion_name: '',
+      runner_up: '',
+      trophy_type: 'champion',
+      edition: 'Edición Oficial',
+      location: 'CC Aves María, Sabaneta',
+      notes: '',
+    });
+    triggerNotice('Título / Trofeo histórico registrado en el Palmarés');
+  };
+
+  const handleDeleteTrophy = async (id: string) => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('club_trophies').delete().eq('id', id);
+      } catch (err) {
+        console.error('Error al eliminar título en Supabase:', err);
+      }
+    }
+    setTrophies(trophies.filter((t) => t.id !== id));
+    triggerNotice('Registro de palmarés eliminado');
   };
 
   // Post
@@ -723,6 +794,7 @@ export const AdminDashboardView: React.FC = () => {
         membership_payments: payments,
         class_schedules: schedules,
         class_attendance: attendance,
+        club_trophies: trophies,
         club_announcements: announcements,
         contact_messages: messages,
       },
@@ -1022,6 +1094,7 @@ export const AdminDashboardView: React.FC = () => {
                     { name: 'Cuotas/Pagos', count: payments.length },
                     { name: 'Horarios', count: schedules.length },
                     { name: 'Asistencias Inder', count: attendance.length },
+                    { name: 'Palmarés', count: trophies.length },
                     { name: 'Avisos', count: announcements.length },
                     { name: 'Mensajes', count: messages.length },
                   ].map((t) => (
@@ -1613,6 +1686,183 @@ export const AdminDashboardView: React.FC = () => {
                           );
                         });
                       })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Sub-sección: Cuadro de Honor & Palmarés Histórico */}
+              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Crown size={20} />
+                      Cuadro de Honor & Palmarés Histórico ({trophies.length})
+                    </h2>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Registro oficial de campeones, subcampeones y logros deportivos del Club Capablanca
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTrophyModal(true)}
+                    className="btn btn--primary btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Plus size={15} />
+                    <span>Añadir Título / Campeón</span>
+                  </button>
+                </div>
+
+                {/* Modal para Registrar Título */}
+                {showTrophyModal && (
+                  <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '1.8rem', marginBottom: '1.8rem' }}>
+                    <h3 style={{ color: 'var(--gold)', marginBottom: '1rem', fontSize: '1.2rem' }}>
+                      Registrar Título / Campeón en el Palmarés
+                    </h3>
+                    <form onSubmit={handleCreateTrophy} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nombre del Torneo / Certamen (ej. Abierto Sabaneta 2026)"
+                          value={newTrophy.title}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, title: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                        <input
+                          type="number"
+                          required
+                          placeholder="Año (ej. 2026)"
+                          value={newTrophy.year}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, year: Number(e.target.value) })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Categoría (ej. Abierto, Semillero Sub-12)"
+                          value={newTrophy.category}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, category: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Campeón / Ganador (Nombre)"
+                          value={newTrophy.champion_name}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, champion_name: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Subcampeón (Opcional)"
+                          value={newTrophy.runner_up}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, runner_up: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                        <select
+                          value={newTrophy.trophy_type}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, trophy_type: e.target.value as any })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        >
+                          <option value="champion">Campeón / Oro 🥇</option>
+                          <option value="runner_up">Subcampeón / Plata 🥈</option>
+                          <option value="third_place">Tercer Lugar / Bronce 🥉</option>
+                          <option value="team_medal">Trofeo por Equipos 🏆</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Edición (ej. XII Edición)"
+                          value={newTrophy.edition}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, edition: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Sede / Ciudad"
+                          value={newTrophy.location}
+                          onChange={(e) => setNewTrophy({ ...newTrophy, location: e.target.value })}
+                          style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+
+                      <textarea
+                        rows={2}
+                        placeholder="Observaciones o hazaña deportiva destacada..."
+                        value={newTrophy.notes}
+                        onChange={(e) => setNewTrophy({ ...newTrophy, notes: e.target.value })}
+                        style={{ padding: '0.7rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', resize: 'vertical' }}
+                      />
+
+                      <div style={{ display: 'flex', gap: '0.8rem' }}>
+                        <button type="submit" className="btn btn--primary btn--sm">Guardar en el Palmarés</button>
+                        <button type="button" onClick={() => setShowTrophyModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Tabla de Trofeos Registrados */}
+                <div style={{ background: '#121212', border: '1px solid #252525', borderRadius: '12px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#181818', borderBottom: '1px solid #2a2a2a', color: '#888', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em' }}>
+                        <th style={{ padding: '0.8rem 1rem' }}>Año & Edición</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Torneo</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Categoría</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Campeón</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Subcampeón</th>
+                        <th style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trophies.map((tr) => (
+                        <tr key={tr.id} style={{ borderBottom: '1px solid #1f1f1f' }}>
+                          <td style={{ padding: '0.8rem 1rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ background: '#252010', color: 'var(--gold)', border: '1px solid #554415', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800, fontSize: '0.75rem' }}>
+                              {tr.year}
+                            </span>
+                            <div style={{ fontSize: '0.72rem', color: '#777', marginTop: '0.2rem' }}>{tr.edition || 'Oficial'}</div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <strong style={{ color: '#eee' }}>{tr.title}</strong>
+                            <div style={{ fontSize: '0.75rem', color: '#777' }}>{tr.location || 'Sabaneta'}</div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <span style={{ background: '#1f1f1f', color: '#bbb', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>
+                              {tr.category}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Crown size={14} color="var(--gold)" />
+                              <strong style={{ color: 'var(--gold)' }}>{tr.champion_name}</strong>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', color: '#aaa' }}>
+                            {tr.runner_up || '—'}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTrophy(tr.id)}
+                              className="btn btn--sm"
+                              style={{ background: '#291212', color: '#ff8a80', border: '1px solid #b71c1c', padding: '0.3rem 0.5rem' }}
+                              title="Eliminar del palmarés"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

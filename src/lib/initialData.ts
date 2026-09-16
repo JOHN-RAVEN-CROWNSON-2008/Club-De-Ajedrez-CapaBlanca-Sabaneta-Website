@@ -1,7 +1,7 @@
 import {
   SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration,
-  ClassAttendance
+  ClassAttendance, ClubTrophy
 } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
@@ -496,6 +496,75 @@ export const INITIAL_ATTENDANCE: ClassAttendance[] = [
     created_at: '2026-09-09T16:00:00Z',
   }
 ];
+
+export const INITIAL_TROPHIES: ClubTrophy[] = [
+  {
+    id: 'tr-1',
+    title: 'Torneo Abierto de Ajedrez Rápido Fiestas de Sabaneta',
+    year: 2025,
+    category: 'Categoría Abierta',
+    champion_name: 'Santiago Gómez',
+    runner_up: 'Andrés Arboleda',
+    trophy_type: 'champion',
+    edition: 'XII Edición Anual',
+    location: 'CC Aves María, Sabaneta',
+    notes: 'Gran final decidida en desempate Armagedón con invicto en 7 rondas.',
+    created_at: '2025-10-12T18:00:00Z',
+  },
+  {
+    id: 'tr-2',
+    title: 'Festival Departamental de Semilleros Sub-12',
+    year: 2025,
+    category: 'Semillero Infantil Sub-12',
+    champion_name: 'Valentina Restrepo',
+    runner_up: 'David Rendón',
+    trophy_type: 'champion',
+    edition: 'Fase Valle de Aburrá',
+    location: 'Liga de Ajedrez de Antioquia, Medellín',
+    notes: 'Puntaje perfecto de 6 puntos en 6 rondas, obteniendo cupo al Nacional.',
+    created_at: '2025-08-20T17:30:00Z',
+  },
+  {
+    id: 'tr-3',
+    title: 'Campeonato Departamental de Blitz Relámpago',
+    year: 2024,
+    category: 'Categoría Blitz 3+2',
+    champion_name: 'Mateo Valencia',
+    runner_up: 'Carlos Mario Peña',
+    trophy_type: 'champion',
+    edition: 'Edición Departamental 2024',
+    location: 'Sabaneta, Antioquia',
+    notes: 'Notable actuación con un performance rating superior a 2100 Elo.',
+    created_at: '2024-11-15T19:00:00Z',
+  },
+  {
+    id: 'tr-4',
+    title: 'Copa Interclubes del Sur del Valle de Aburrá',
+    year: 2024,
+    category: 'Torneo por Equipos Mayores',
+    champion_name: 'Equipo Capablanca Sabaneta Élite',
+    runner_up: 'Club de Ajedrez Envigado',
+    trophy_type: 'team_medal',
+    edition: 'Copa Confraternidad 2024',
+    location: 'Sede CC Aves María',
+    notes: 'Victoria por equipos 3.5 a 0.5 en la ronda final decisiva.',
+    created_at: '2024-06-30T16:00:00Z',
+  },
+  {
+    id: 'tr-5',
+    title: 'Torneo Juvenil San Juan Bautista de Sabaneta',
+    year: 2023,
+    category: 'Juvenil Sub-16',
+    champion_name: 'Santiago Gómez',
+    runner_up: 'Mateo Valencia',
+    trophy_type: 'champion',
+    edition: 'Edición Tradicional 2023',
+    location: 'Parque Principal de Sabaneta',
+    notes: 'Torneo al aire libre con más de 48 deportistas del municipio.',
+    created_at: '2023-06-24T15:00:00Z',
+  }
+];
+
 
 
 

@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star } from 'lucide-react';
+import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_MEMBERS } from '../../lib/initialData';
-import { UserProfile } from '../../types/database';
+import { INITIAL_MEMBERS, INITIAL_TROPHIES } from '../../lib/initialData';
+import { UserProfile, ClubTrophy } from '../../types/database';
 
 export const ClubView: React.FC = () => {
   const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
+  const [trophies, setTrophies] = useState<ClubTrophy[]>(INITIAL_TROPHIES);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [trophyYearFilter, setTrophyYearFilter] = useState<string>('all');
 
   useEffect(() => {
-    async function loadMembers() {
+    async function loadClubData() {
       if (!isSupabaseConfigured()) {
         setMembers(INITIAL_MEMBERS);
+        setTrophies(INITIAL_TROPHIES);
         return;
       }
 
@@ -27,13 +30,25 @@ export const ClubView: React.FC = () => {
         } else {
           setMembers(INITIAL_MEMBERS);
         }
+
+        const { data: trData } = await supabase
+          .from('club_trophies')
+          .select('*')
+          .order('year', { ascending: false });
+
+        if (trData && trData.length > 0) {
+          setTrophies(trData as ClubTrophy[]);
+        } else {
+          setTrophies(INITIAL_TROPHIES);
+        }
       } catch (err) {
-        console.error('Error al cargar escalafón de Supabase:', err);
+        console.error('Error al cargar escalafón y trofeos de Supabase:', err);
         setMembers(INITIAL_MEMBERS);
+        setTrophies(INITIAL_TROPHIES);
       }
     }
 
-    loadMembers();
+    loadClubData();
   }, []);
   return (
     <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
@@ -251,6 +266,134 @@ export const ClubView: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      {/* Cuadro de Honor y Palmarés Deportivo */}
+      <section className="section" style={{ background: '#0a0a0a', color: '#fff', borderTop: '1px solid #1a1a1a', paddingBlock: '4rem' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="pill pill--gold" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Crown size={14} /> Campeones & Títulos
+            </span>
+            <h2 className="display display--gold" style={{ fontSize: 'var(--step-3)', marginTop: '0.8rem' }}>
+              Cuadro de Honor y Palmarés Deportivo
+            </h2>
+            <p style={{ color: '#888', maxWidth: '650px', margin: '0.8rem auto 0', fontSize: '1.05rem', lineHeight: 1.6 }}>
+              Reconocimiento a nuestros atletas y delegaciones que han dejado en alto los colores del Club Capablanca en torneos departamentales, metropolitanos y abiertos.
+            </p>
+          </div>
+
+          {/* Filtros de Palmarés */}
+          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+            <button
+              type="button"
+              className={`btn btn--sm ${trophyYearFilter === 'all' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setTrophyYearFilter('all')}
+            >
+              Todos los Títulos ({trophies.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${trophyYearFilter === '2025' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setTrophyYearFilter('2025')}
+            >
+              Temporada 2025
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${trophyYearFilter === '2024' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setTrophyYearFilter('2024')}
+            >
+              Temporada 2024
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${trophyYearFilter === '2023' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setTrophyYearFilter('2023')}
+            >
+              Temporada 2023
+            </button>
+          </div>
+
+          {/* Grid de Trofeos y Campeones */}
+          {(() => {
+            const filteredTrophies = trophies.filter((t) => {
+              if (trophyYearFilter === 'all') return true;
+              return t.year.toString() === trophyYearFilter;
+            });
+
+            if (filteredTrophies.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '3rem', background: '#121212', borderRadius: '12px', border: '1px solid #222' }}>
+                  <p style={{ color: '#888' }}>No hay registros de campeonatos en este periodo.</p>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.8rem' }}>
+                {filteredTrophies.map((tr) => (
+                  <div
+                    key={tr.id}
+                    style={{
+                      background: 'linear-gradient(180deg, #161616 0%, #111111 100%)',
+                      border: '1px solid #282828',
+                      borderRadius: '16px',
+                      padding: '1.8rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }} />
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <span style={{ fontSize: '0.75rem', background: '#252010', color: 'var(--gold)', border: '1px solid #554415', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800 }}>
+                          {tr.year} · {tr.edition || 'Torneo Oficial'}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#ffb300' }}>
+                          <Trophy size={18} />
+                        </div>
+                      </div>
+
+                      <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
+                        {tr.title}
+                      </h3>
+                      <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '1.2rem' }}>
+                        {tr.category} · {tr.location || 'Sabaneta, Antioquia'}
+                      </div>
+
+                      <div style={{ background: '#181818', border: '1px solid #222', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: tr.runner_up ? '0.4rem' : 0 }}>
+                          <Crown size={16} color="var(--gold)" />
+                          <span style={{ fontSize: '0.9rem', color: '#ccc' }}>Campeón:</span>
+                          <strong style={{ color: 'var(--gold)', fontSize: '0.95rem' }}>{tr.champion_name}</strong>
+                        </div>
+                        {tr.runner_up && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#888' }}>
+                            <Medal size={15} color="#b0bec5" />
+                            <span>Subcampeón:</span>
+                            <span style={{ color: '#ccc' }}>{tr.runner_up}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {tr.notes && (
+                        <p style={{ color: '#777', fontSize: '0.82rem', margin: 0, fontStyle: 'italic', lineHeight: 1.5 }}>
+                          "{tr.notes}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </section>
 
