@@ -359,17 +359,23 @@ export const AdminDashboardView: React.FC = () => {
     );
     if (eventRegs.length >= 2) {
       return eventRegs.map((r) => {
+        let ext: any = null;
+        try {
+          if (r.notes && r.notes.startsWith('{')) {
+            ext = JSON.parse(r.notes);
+          }
+        } catch {}
+
         const mem = members.find((m) => m.id === r.user_id);
-        const name = r.profile
-          ? `${r.profile.nombre} ${r.profile.apellido}`
-          : (mem ? `${mem.nombre} ${mem.apellido}` : 'Ajedrecista');
-        const elo = r.profile?.elo_rating || mem?.elo_rating || 1500;
+        const name = ext?.fullName
+          || (r.profile ? `${r.profile.nombre} ${r.profile.apellido}` : (mem ? `${mem.nombre} ${mem.apellido}` : 'Ajedrecista'));
+        const elo = Number(ext?.eloRating) || r.profile?.elo_rating || mem?.elo_rating || 1500;
         return {
           id: r.id,
           name,
           elo,
-          category: r.profile?.categoria_ajedrez || mem?.categoria_ajedrez,
-          club: 'Capablanca Sabaneta',
+          category: ext?.category || r.profile?.categoria_ajedrez || mem?.categoria_ajedrez || 'Categoría Abierta',
+          club: ext?.clubOrCity || 'Capablanca Sabaneta',
         };
       });
     }
@@ -562,17 +568,36 @@ export const AdminDashboardView: React.FC = () => {
   const handleExportRosterCSV = (eventId: string) => {
     const ev = events.find((e) => e.id === eventId);
     const eventRegs = registrations.filter((r) => r.event_id === eventId);
-    const headers = ['ID Registro', 'Torneo', 'Nombre Jugador', 'Correo', 'Teléfono', 'Categoría', 'Elo', 'Estado'];
+    const headers = ['Radicado / ID', 'Torneo', 'Nombre Jugador', 'Documento', 'Club / Procedencia', 'Correo', 'Teléfono', 'Categoría', 'Elo', 'FIDE ID', 'Estado'];
     const rows = eventRegs.map((r) => {
+      let ext: any = null;
+      try {
+        if (r.notes && r.notes.startsWith('{')) {
+          ext = JSON.parse(r.notes);
+        }
+      } catch {}
       const p = r.profile || members.find((m) => m.id === r.user_id);
+      const name = ext?.fullName || (p ? `${p.nombre} ${p.apellido}` : 'Afiliado');
+      const doc = ext?.doc || (p ? `${p.doc_type || 'CC'} ${p.doc_number || ''}`.trim() : 'N/A');
+      const club = ext?.clubOrCity || 'Capablanca Sabaneta';
+      const email = ext?.email || p?.correo || '';
+      const phone = ext?.phone || p?.telefono || '';
+      const cat = ext?.category || p?.categoria_ajedrez || '';
+      const elo = ext?.eloRating || p?.elo_rating || 0;
+      const fide = ext?.fideId || p?.fide_id || '';
+      const code = ext?.regCode || r.id;
+
       return [
-        r.id,
+        code,
         ev?.title || 'Torneo',
-        p ? `${p.nombre} ${p.apellido}` : 'Afiliado',
-        p?.correo || '',
-        p?.telefono || '',
-        p?.categoria_ajedrez || '',
-        p?.elo_rating || 0,
+        name,
+        doc,
+        club,
+        email,
+        phone,
+        cat,
+        elo,
+        fide,
         r.status,
       ];
     });
@@ -2143,31 +2168,70 @@ export const AdminDashboardView: React.FC = () => {
                         return filteredRegs.map((reg) => {
                           const ev = events.find((e) => e.id === reg.event_id);
                           const prof = reg.profile || members.find((m) => m.id === reg.user_id);
+                          let ext: any = null;
+                          try {
+                            if (reg.notes && reg.notes.startsWith('{')) {
+                              ext = JSON.parse(reg.notes);
+                            }
+                          } catch {}
+
+                          const isExternal = !!ext;
+                          const athleteName = ext?.fullName || (prof ? `${prof.nombre} ${prof.apellido}` : 'Deportista');
+                          const athletePhone = ext?.phone || prof?.telefono || '3002545835';
+                          const athleteEmail = ext?.email || prof?.correo || 'N/A';
+                          const athleteCategory = ext?.category || prof?.categoria_ajedrez || 'Categoría Abierta';
+                          const athleteElo = ext?.eloRating || prof?.elo_rating || 'S/E';
+                          const athleteFide = ext?.fideId || prof?.fide_id || '';
+                          const athleteClub = ext?.clubOrCity || 'Capablanca Sabaneta';
+                          const radicadoCode = ext?.regCode || `REG-CAPA-${reg.id.slice(0, 6).toUpperCase()}-2026`;
+                          const docInfo = ext?.doc || (prof ? `${prof.doc_type || 'CC'} ${prof.doc_number || ''}`.trim() : null);
+                          const receiptUrl = ext?.paymentReceiptUrl;
 
                           return (
                             <tr key={reg.id} style={{ borderBottom: '1px solid #1f1f1f' }}>
                               <td style={{ padding: '0.8rem 1rem' }}>
-                                <div style={{ fontWeight: 600, color: '#fff' }}>
-                                  {prof ? `${prof.nombre} ${prof.apellido}` : 'Deportista Afiliado'}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 600, color: '#fff' }}>{athleteName}</span>
+                                  <span
+                                    style={{
+                                      fontSize: '0.65rem',
+                                      fontWeight: 700,
+                                      padding: '0.1rem 0.4rem',
+                                      borderRadius: '4px',
+                                      background: isExternal ? 'rgba(168, 85, 247, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                                      color: isExternal ? '#c084fc' : '#4ade80',
+                                      border: `1px solid ${isExternal ? '#7e22ce' : '#15803d'}`,
+                                    }}
+                                  >
+                                    {isExternal ? 'Preinscripción Web' : 'Afiliado'}
+                                  </span>
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#777' }}>
-                                  @{prof?.usuario || 'afiliado'}
+                                <div style={{ fontSize: '0.72rem', color: 'var(--gold)', fontWeight: 600, marginTop: '0.15rem' }}>
+                                  {radicadoCode}
                                 </div>
+                                {docInfo && (
+                                  <div style={{ fontSize: '0.72rem', color: '#777' }}>
+                                    Doc: {docInfo} · {athleteClub}
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '0.8rem 1rem' }}>
                                 <div style={{ color: 'var(--gold)', fontWeight: 600 }}>
-                                  {prof?.categoria_ajedrez || 'Iniciación'}
+                                  {athleteCategory}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
-                                  Elo: {prof?.elo_rating || 'S/E'} {prof?.fide_id ? `· FIDE: ${prof.fide_id}` : ''}
+                                  Elo: {athleteElo} {athleteFide ? `· FIDE: ${athleteFide}` : ''}
                                 </div>
                               </td>
                               <td style={{ padding: '0.8rem 1rem', color: '#ccc' }}>
-                                {ev?.title || 'Torneo General'}
+                                <div>{ev?.title || 'Torneo General'}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#777' }}>
+                                  {ev?.event_date || 'Fecha pendiente'} · {ev?.rhythm || 'Ritmo oficial'}
+                                </div>
                               </td>
                               <td style={{ padding: '0.8rem 1rem' }}>
-                                <div style={{ color: '#aaa' }}>{prof?.correo || 'N/A'}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>{prof?.telefono || 'Sin tel'}</div>
+                                <div style={{ color: '#aaa' }}>{athleteEmail}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#666' }}>{athletePhone}</div>
                               </td>
                               <td style={{ padding: '0.8rem 1rem' }}>
                                 <span
@@ -2177,40 +2241,67 @@ export const AdminDashboardView: React.FC = () => {
                                     fontSize: '0.72rem',
                                     fontWeight: 700,
                                     textTransform: 'uppercase',
-                                    background: reg.status === 'confirmed' ? '#14381e' : reg.status === 'attended' ? '#1b2f4a' : '#333',
-                                    color: reg.status === 'confirmed' ? '#81c784' : reg.status === 'attended' ? '#90caf9' : '#ccc',
-                                    border: `1px solid ${reg.status === 'confirmed' ? '#2e7d32' : reg.status === 'attended' ? '#1565c0' : '#444'}`,
+                                    background:
+                                      reg.status === 'confirmed' ? '#14381e' :
+                                      reg.status === 'attended' ? '#1b2f4a' :
+                                      reg.status === 'cancelled' ? '#381414' : '#332b14',
+                                    color:
+                                      reg.status === 'confirmed' ? '#81c784' :
+                                      reg.status === 'attended' ? '#90caf9' :
+                                      reg.status === 'cancelled' ? '#ef9a9a' : '#ffe082',
+                                    border: `1px solid ${
+                                      reg.status === 'confirmed' ? '#2e7d32' :
+                                      reg.status === 'attended' ? '#1565c0' :
+                                      reg.status === 'cancelled' ? '#c62828' : '#f57f17'
+                                    }`,
                                   }}
                                 >
-                                  {reg.status === 'confirmed' ? 'Confirmado' : reg.status === 'attended' ? 'En Sala / Asistió' : reg.status}
+                                  {reg.status === 'confirmed' ? 'Confirmado' :
+                                   reg.status === 'attended' ? 'En Sala / Asistió' :
+                                   reg.status === 'cancelled' ? 'Cancelado' : 'Pendiente Pago'}
                                 </span>
                               </td>
                               <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
-                                <div style={{ display: 'inline-flex', gap: '0.3rem' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateRegistrationStatus(reg.id, 'confirmed')}
-                                    className="btn btn--sm"
-                                    style={{ background: '#1c2e1c', color: '#a5d6a7', border: '1px solid #2e7d32', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
-                                    title="Confirmar inscripción"
-                                  >
-                                    Confirmar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateRegistrationStatus(reg.id, 'attended')}
-                                    className="btn btn--sm"
-                                    style={{ background: '#182538', color: '#90caf9', border: '1px solid #1976d2', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
-                                    title="Marcar presencia en sala de juego"
-                                  >
-                                    Presente
-                                  </button>
+                                <div style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                  {receiptUrl && (
+                                    <a
+                                      href={receiptUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn--sm"
+                                      style={{ background: '#1c1c1c', color: 'var(--gold)', border: '1px solid #444', padding: '0.2rem 0.45rem', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                                      title="Ver comprobante de pago adjunto"
+                                    >
+                                      <Eye size={11} />
+                                      <span>Recibo</span>
+                                    </a>
+                                  )}
+                                  {reg.status !== 'confirmed' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRegistrationStatus(reg.id, 'confirmed')}
+                                      className="btn btn--sm"
+                                      style={{ background: '#1c2e1c', color: '#a5d6a7', border: '1px solid #2e7d32', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
+                                      title="Confirmar inscripción"
+                                    >
+                                      Confirmar
+                                    </button>
+                                  )}
+                                  {reg.status !== 'attended' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRegistrationStatus(reg.id, 'attended')}
+                                      className="btn btn--sm"
+                                      style={{ background: '#182538', color: '#90caf9', border: '1px solid #1976d2', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
+                                      title="Marcar presencia en sala de juego"
+                                    >
+                                      Presente
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const phone = prof?.telefono || '3002545835';
-                                      const name = prof ? `${prof.nombre} ${prof.apellido}` : 'Deportista';
-                                      whatsappService.openTournamentReminder(phone, name, ev?.title || 'Torneo Capablanca', ev?.event_date || 'Próxima fecha', ev?.event_time || '09:00 AM');
+                                      whatsappService.openTournamentReminder(athletePhone, athleteName, ev?.title || 'Torneo Capablanca', ev?.event_date || 'Próxima fecha', ev?.event_time || '09:00 AM');
                                     }}
                                     className="btn btn--sm"
                                     style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', padding: '0.2rem 0.45rem', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
@@ -2219,6 +2310,17 @@ export const AdminDashboardView: React.FC = () => {
                                     <MessageCircle size={11} />
                                     <span>WhatsApp</span>
                                   </button>
+                                  {reg.status !== 'cancelled' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateRegistrationStatus(reg.id, 'cancelled')}
+                                      className="btn btn--sm"
+                                      style={{ background: '#281515', color: '#ef5350', border: '1px solid #c62828', padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                                      title="Cancelar inscripción"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
