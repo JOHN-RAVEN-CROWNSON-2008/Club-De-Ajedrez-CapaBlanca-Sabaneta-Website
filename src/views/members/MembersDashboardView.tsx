@@ -15,6 +15,7 @@ import { AffiliationCertificateModal } from '../../components/common/Affiliation
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle';
 import { MemberLoginView } from '../auth/MemberLoginView';
+import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, loading, logout, updateProfile, isConfigured } = useAuth();
@@ -31,6 +32,7 @@ export const MembersDashboardView: React.FC = () => {
   const [selectedDocCategory, setSelectedDocCategory] = useState<string>('all');
   const [docSearch, setDocSearch] = useState<string>('');
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [tournamentSubTabs, setTournamentSubTabs] = useState<Record<string, 'matches' | 'standings'>>({});
   const [pgnModalData, setPgnModalData] = useState<{
     isOpen: boolean;
     title: string;
@@ -525,10 +527,14 @@ export const MembersDashboardView: React.FC = () => {
                           <span>{evt.location}</span>
                         </div>
                       </div>
-                      {/* Emparejamientos & Resultados */}
+                      {/* Emparejamientos & Clasificación */}
                       {(() => {
                         const eventMatches = matches.filter((m) => m.event_id === evt.id);
                         const isExpanded = expandedEventId === evt.id;
+                        const subTab = tournamentSubTabs[evt.id] || 'matches';
+                        const eventStandings = calculateTournamentStandings(eventMatches);
+                        const athleteName = `${user?.nombre || ''} ${user?.apellido || ''}`.trim().toLowerCase();
+                        const athleteLastName = (user?.apellido || '').trim().toLowerCase();
 
                         return (
                           <div style={{ marginTop: '1rem', borderTop: '1px solid #252525', paddingTop: '0.8rem' }}>
@@ -551,76 +557,223 @@ export const MembersDashboardView: React.FC = () => {
                             >
                               <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <Swords size={15} />
-                                Emparejamientos & Resultados ({eventMatches.length})
+                                Partidas ({eventMatches.length}) & Clasificación
                               </span>
                               {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                             </button>
 
                             {isExpanded && (
-                              <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {eventMatches.length === 0 ? (
-                                  <p style={{ fontSize: '0.78rem', color: '#777', fontStyle: 'italic', margin: 0 }}>
-                                    Emparejamientos pendientes de publicación para este torneo.
-                                  </p>
-                                ) : (
-                                  eventMatches.map((m) => (
-                                    <div
-                                      key={m.id}
-                                      style={{
-                                        background: '#111',
-                                        border: '1px solid #292929',
-                                        borderRadius: '6px',
-                                        padding: '0.5rem 0.7rem',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        gap: '0.5rem',
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1 }}>
-                                        <div style={{ fontSize: '0.7rem', color: '#888' }}>
-                                          Mesa {m.board_number} · Ronda {m.round}
-                                        </div>
-                                        <div style={{ fontSize: '0.78rem', color: '#eee' }}>
-                                          {m.white_player} <span style={{ color: 'var(--gold)', fontWeight: 700 }}>vs</span> {m.black_player}
-                                        </div>
-                                      </div>
+                              <div style={{ marginTop: '0.8rem' }}>
+                                {/* Pestañas internas: Partidas vs Tabla de Posiciones */}
+                                <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #252525', marginBottom: '0.8rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTournamentSubTabs((prev) => ({ ...prev, [evt.id]: 'matches' }))}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      borderBottom: subTab === 'matches' ? '2px solid var(--gold)' : '2px solid transparent',
+                                      color: subTab === 'matches' ? 'var(--gold)' : '#777',
+                                      fontWeight: subTab === 'matches' ? 700 : 500,
+                                      fontSize: '0.78rem',
+                                      padding: '0.35rem 0.7rem',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem',
+                                    }}
+                                  >
+                                    <Swords size={13} />
+                                    <span>Partidas ({eventMatches.length})</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTournamentSubTabs((prev) => ({ ...prev, [evt.id]: 'standings' }))}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      borderBottom: subTab === 'standings' ? '2px solid var(--gold)' : '2px solid transparent',
+                                      color: subTab === 'standings' ? 'var(--gold)' : '#777',
+                                      fontWeight: subTab === 'standings' ? 700 : 500,
+                                      fontSize: '0.78rem',
+                                      padding: '0.35rem 0.7rem',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem',
+                                    }}
+                                  >
+                                    <Trophy size={13} />
+                                    <span>Tabla de Posiciones ({eventStandings.length})</span>
+                                  </button>
+                                </div>
 
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                        <span style={{ background: '#222', color: 'var(--gold)', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                                          {m.result}
-                                        </span>
-                                        {m.pgn && (
+                                {/* Contenido 1: Partidas */}
+                                {subTab === 'matches' && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {eventMatches.length === 0 ? (
+                                      <p style={{ fontSize: '0.78rem', color: '#777', fontStyle: 'italic', margin: 0 }}>
+                                        Emparejamientos pendientes de publicación para este torneo.
+                                      </p>
+                                    ) : (
+                                      eventMatches.map((m) => (
+                                        <div
+                                          key={m.id}
+                                          style={{
+                                            background: '#111',
+                                            border: '1px solid #292929',
+                                            borderRadius: '6px',
+                                            padding: '0.5rem 0.7rem',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1 }}>
+                                            <div style={{ fontSize: '0.7rem', color: '#888' }}>
+                                              Mesa {m.board_number} · Ronda {m.round}
+                                            </div>
+                                            <div style={{ fontSize: '0.78rem', color: '#eee' }}>
+                                              {m.white_player} <span style={{ color: 'var(--gold)', fontWeight: 700 }}>vs</span> {m.black_player}
+                                            </div>
+                                          </div>
+
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <span style={{ background: '#222', color: 'var(--gold)', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                              {m.result}
+                                            </span>
+                                            {m.pgn && (
+                                              <button
+                                                type="button"
+                                                onClick={() => setPgnModalData({
+                                                  isOpen: true,
+                                                  title: `Partida Mesa ${m.board_number} (Ronda ${m.round})`,
+                                                  whitePlayer: m.white_player,
+                                                  blackPlayer: m.black_player,
+                                                  result: m.result,
+                                                  pgn: m.pgn || '',
+                                                })}
+                                                className="btn btn--sm"
+                                                style={{
+                                                  background: '#1e1e1e',
+                                                  color: 'var(--gold)',
+                                                  border: '1px solid var(--gold)',
+                                                  padding: '0.15rem 0.4rem',
+                                                  fontSize: '0.7rem',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '0.25rem',
+                                                }}
+                                                title="Ver visor PGN"
+                                              >
+                                                <Eye size={12} />
+                                                <span>PGN</span>
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Contenido 2: Tabla de Posiciones */}
+                                {subTab === 'standings' && (
+                                  <div>
+                                    {eventStandings.length === 0 ? (
+                                      <p style={{ fontSize: '0.78rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '0.5rem 0' }}>
+                                        Aún no hay partidas computadas para generar la tabla de posiciones de este torneo.
+                                      </p>
+                                    ) : (
+                                      <div>
+                                        <div style={{ overflowX: 'auto' }}>
+                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                                            <thead>
+                                              <tr style={{ background: '#161616', color: '#888', borderBottom: '1px solid #2a2a2a', textTransform: 'uppercase' }}>
+                                                <th style={{ padding: '0.4rem 0.5rem' }}>#</th>
+                                                <th style={{ padding: '0.4rem 0.5rem' }}>Deportista</th>
+                                                <th style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>PJ</th>
+                                                <th style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>PG</th>
+                                                <th style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>PE</th>
+                                                <th style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>PP</th>
+                                                <th style={{ padding: '0.4rem 0.3rem', textAlign: 'center' }}>SB</th>
+                                                <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: 'var(--gold)' }}>PTS</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {eventStandings.map((st) => {
+                                                const isCurrentAthlete =
+                                                  (athleteName && st.name.toLowerCase().includes(athleteName)) ||
+                                                  (athleteLastName && athleteLastName.length >= 3 && st.name.toLowerCase().includes(athleteLastName));
+
+                                                return (
+                                                  <tr
+                                                    key={st.name}
+                                                    style={{
+                                                      borderBottom: '1px solid #202020',
+                                                      background: isCurrentAthlete
+                                                        ? 'rgba(212,175,55,0.12)'
+                                                        : st.rank === 1
+                                                        ? 'rgba(212,175,55,0.05)'
+                                                        : 'transparent',
+                                                      borderLeft: isCurrentAthlete ? '3px solid var(--gold)' : 'none',
+                                                    }}
+                                                  >
+                                                    <td style={{ padding: '0.4rem 0.5rem', fontWeight: 800 }}>
+                                                      <span
+                                                        style={{
+                                                          display: 'inline-flex',
+                                                          alignItems: 'center',
+                                                          justifyContent: 'center',
+                                                          width: '18px',
+                                                          height: '18px',
+                                                          borderRadius: '50%',
+                                                          fontSize: '0.68rem',
+                                                          background: st.rank === 1 ? '#ffd700' : st.rank === 2 ? '#c0c0c0' : st.rank === 3 ? '#cd7f32' : '#222',
+                                                          color: st.rank <= 3 ? '#000' : '#888',
+                                                        }}
+                                                      >
+                                                        {st.rank}
+                                                      </span>
+                                                    </td>
+                                                    <td style={{ padding: '0.4rem 0.5rem', fontWeight: isCurrentAthlete ? 700 : 500, color: isCurrentAthlete ? 'var(--gold)' : '#fff' }}>
+                                                      <span>{st.name}</span>
+                                                      {isCurrentAthlete && (
+                                                        <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', background: 'var(--gold)', color: '#000', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
+                                                          TÚ
+                                                        </span>
+                                                      )}
+                                                    </td>
+                                                    <td style={{ padding: '0.4rem 0.3rem', textAlign: 'center', color: '#aaa' }}>{st.played}</td>
+                                                    <td style={{ padding: '0.4rem 0.3rem', textAlign: 'center', color: '#4ade80' }}>{st.won}</td>
+                                                    <td style={{ padding: '0.4rem 0.3rem', textAlign: 'center', color: '#facc15' }}>{st.drawn}</td>
+                                                    <td style={{ padding: '0.4rem 0.3rem', textAlign: 'center', color: '#f87171' }}>{st.lost}</td>
+                                                    <td style={{ padding: '0.4rem 0.3rem', textAlign: 'center', color: '#888' }}>{st.sonnebornBerger}</td>
+                                                    <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 800, color: 'var(--gold)' }}>
+                                                      {st.points}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+
+                                        <div style={{ marginTop: '0.6rem', textAlign: 'right' }}>
                                           <button
                                             type="button"
-                                            onClick={() => setPgnModalData({
-                                              isOpen: true,
-                                              title: `Partida Mesa ${m.board_number} (Ronda ${m.round})`,
-                                              whitePlayer: m.white_player,
-                                              blackPlayer: m.black_player,
-                                              result: m.result,
-                                              pgn: m.pgn || '',
-                                            })}
-                                            className="btn btn--sm"
-                                            style={{
-                                              background: '#1e1e1e',
-                                              color: 'var(--gold)',
-                                              border: '1px solid var(--gold)',
-                                              padding: '0.15rem 0.4rem',
-                                              fontSize: '0.7rem',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '0.25rem',
-                                            }}
-                                            title="Ver visor PGN"
+                                            onClick={() => exportStandingsToCsv(evt.title, eventStandings)}
+                                            className="btn btn--ghost btn--sm"
+                                            style={{ fontSize: '0.7rem', padding: '0.2rem 0.45rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
                                           >
-                                            <Eye size={12} />
-                                            <span>PGN</span>
+                                            <Download size={11} />
+                                            <span>Descargar Tabla Oficial (CSV)</span>
                                           </button>
-                                        )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             )}

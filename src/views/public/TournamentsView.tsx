@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
 import { ClubEvent, TournamentMatch } from '../../types/database';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
+import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
 export const TournamentsView: React.FC = () => {
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
@@ -12,6 +13,7 @@ export const TournamentsView: React.FC = () => {
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings'>>({});
   const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
 
   useEffect(() => {
@@ -186,10 +188,12 @@ export const TournamentsView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección Desplegable de Emparejamientos & Resultados */}
+                  {/* Sección Desplegable de Emparejamientos & Resultados / Tabla de Posiciones */}
                   {(() => {
                     const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                    const eventStandings = calculateTournamentStandings(eventMatches);
                     const isExpanded = expandedEventId === evt.id;
+                    const activeTab = tournamentTab[evt.id] || 'matches';
 
                     return (
                       <div style={{ marginTop: '1.2rem', borderTop: '1px solid #252525', paddingTop: '1rem' }}>
@@ -212,88 +216,214 @@ export const TournamentsView: React.FC = () => {
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <Swords size={16} />
-                            Emparejamientos & Resultados ({eventMatches.length})
+                            Emparejamientos ({eventMatches.length}) & Posiciones ({eventStandings.length})
                           </span>
                           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
 
                         {isExpanded && (
-                          <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            {eventMatches.length === 0 ? (
-                              <p style={{ fontSize: '0.8rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '0.5rem 0' }}>
-                                Los emparejamientos de la ronda se publicarán 15 minutos antes de la hora pactada.
-                              </p>
-                            ) : (
-                              eventMatches.map((m) => (
-                                <div
-                                  key={m.id}
-                                  style={{
-                                    background: '#111',
-                                    border: '1px solid #292929',
-                                    borderRadius: '8px',
-                                    padding: '0.6rem 0.8rem',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    gap: '0.6rem',
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1 }}>
-                                    <div style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>
-                                      Mesa {m.board_number} · Ronda {m.round}
-                                    </div>
-                                    <div style={{ fontSize: '0.82rem', color: '#eee' }}>
-                                      <span>{m.white_player}</span>
-                                      <span style={{ color: 'var(--gold)', margin: '0 0.3rem', fontWeight: 700 }}>vs</span>
-                                      <span>{m.black_player}</span>
-                                    </div>
-                                  </div>
+                          <div style={{ marginTop: '0.8rem' }}>
+                            {/* Pestañas: Emparejamientos vs Tabla de Posiciones */}
+                            <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem', marginBottom: '0.8rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setTournamentTab({ ...tournamentTab, [evt.id]: 'matches' })}
+                                style={{
+                                  background: activeTab === 'matches' ? '#252525' : 'transparent',
+                                  color: activeTab === 'matches' ? 'var(--gold)' : '#888',
+                                  border: '1px solid',
+                                  borderColor: activeTab === 'matches' ? 'var(--gold)' : '#333',
+                                  borderRadius: '6px',
+                                  padding: '0.25rem 0.65rem',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}
+                              >
+                                <Swords size={13} />
+                                <span>Partidas ({eventMatches.length})</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTournamentTab({ ...tournamentTab, [evt.id]: 'standings' })}
+                                style={{
+                                  background: activeTab === 'standings' ? '#252525' : 'transparent',
+                                  color: activeTab === 'standings' ? 'var(--gold)' : '#888',
+                                  border: '1px solid',
+                                  borderColor: activeTab === 'standings' ? 'var(--gold)' : '#333',
+                                  borderRadius: '6px',
+                                  padding: '0.25rem 0.65rem',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}
+                              >
+                                <Trophy size={13} />
+                                <span>Tabla de Posiciones ({eventStandings.length})</span>
+                              </button>
+                            </div>
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <span
+                            {/* Contenido: Emparejamientos */}
+                            {activeTab === 'matches' && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                {eventMatches.length === 0 ? (
+                                  <p style={{ fontSize: '0.8rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '0.5rem 0' }}>
+                                    Los emparejamientos de la ronda se publicarán 15 minutos antes de la hora pactada.
+                                  </p>
+                                ) : (
+                                  eventMatches.map((m) => (
+                                    <div
+                                      key={m.id}
                                       style={{
-                                        background: '#222',
-                                        border: '1px solid #333',
-                                        color: 'var(--gold)',
-                                        fontWeight: 800,
-                                        fontSize: '0.78rem',
-                                        padding: '0.2rem 0.5rem',
-                                        borderRadius: '4px',
+                                        background: '#111',
+                                        border: '1px solid #292929',
+                                        borderRadius: '8px',
+                                        padding: '0.6rem 0.8rem',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '0.6rem',
                                       }}
                                     >
-                                      {m.result}
-                                    </span>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1 }}>
+                                        <div style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>
+                                          Mesa {m.board_number} · Ronda {m.round}
+                                        </div>
+                                        <div style={{ fontSize: '0.82rem', color: '#eee' }}>
+                                          <span>{m.white_player}</span>
+                                          <span style={{ color: 'var(--gold)', margin: '0 0.3rem', fontWeight: 700 }}>vs</span>
+                                          <span>{m.black_player}</span>
+                                        </div>
+                                      </div>
 
-                                    {m.pgn && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span
+                                          style={{
+                                            background: '#222',
+                                            border: '1px solid #333',
+                                            color: 'var(--gold)',
+                                            fontWeight: 800,
+                                            fontSize: '0.78rem',
+                                            padding: '0.2rem 0.5rem',
+                                            borderRadius: '4px',
+                                          }}
+                                        >
+                                          {m.result}
+                                        </span>
+
+                                        {m.pgn && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setActivePgnMatch(m)}
+                                            className="btn btn--sm"
+                                            style={{
+                                              background: '#1e1e1e',
+                                              color: 'var(--gold)',
+                                              border: '1px solid var(--gold)',
+                                              padding: '0.2rem 0.5rem',
+                                              fontSize: '0.72rem',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.3rem',
+                                            }}
+                                            title="Ver visor PGN de la partida"
+                                          >
+                                            <Eye size={12} />
+                                            <span>PGN</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+
+                            {/* Contenido: Tabla de Posiciones */}
+                            {activeTab === 'standings' && (
+                              <div>
+                                {eventStandings.length === 0 ? (
+                                  <p style={{ fontSize: '0.8rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '0.5rem 0' }}>
+                                    Aún no hay partidas computadas para generar la tabla de posiciones de este torneo.
+                                  </p>
+                                ) : (
+                                  <div>
+                                    <div style={{ overflowX: 'auto' }}>
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'left' }}>
+                                        <thead>
+                                          <tr style={{ background: '#161616', color: '#888', borderBottom: '1px solid #2a2a2a', textTransform: 'uppercase' }}>
+                                            <th style={{ padding: '0.45rem 0.6rem' }}>#</th>
+                                            <th style={{ padding: '0.45rem 0.6rem' }}>Deportista</th>
+                                            <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>PJ</th>
+                                            <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>PG</th>
+                                            <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>PE</th>
+                                            <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>PP</th>
+                                            <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>SB</th>
+                                            <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right', color: 'var(--gold)' }}>PTS</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {eventStandings.map((st) => (
+                                            <tr key={st.name} style={{ borderBottom: '1px solid #202020', background: st.rank === 1 ? 'rgba(212,175,55,0.06)' : 'transparent' }}>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 800 }}>
+                                                <span style={{
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  width: '20px',
+                                                  height: '20px',
+                                                  borderRadius: '50%',
+                                                  fontSize: '0.7rem',
+                                                  background: st.rank === 1 ? '#ffd700' : st.rank === 2 ? '#c0c0c0' : st.rank === 3 ? '#cd7f32' : '#222',
+                                                  color: st.rank <= 3 ? '#000' : '#888'
+                                                }}>
+                                                  {st.rank}
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 600, color: '#fff' }}>
+                                                {st.name}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#aaa' }}>{st.played}</td>
+                                              <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#4ade80' }}>{st.won}</td>
+                                              <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#facc15' }}>{st.drawn}</td>
+                                              <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#f87171' }}>{st.lost}</td>
+                                              <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#888' }}>{st.sonnebornBerger}</td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--gold)', fontSize: '0.85rem' }}>
+                                                {st.points}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+
+                                    <div style={{ marginTop: '0.75rem', textAlign: 'right' }}>
                                       <button
                                         type="button"
-                                        onClick={() => setActivePgnMatch(m)}
-                                        className="btn btn--sm"
-                                        style={{
-                                          background: '#1e1e1e',
-                                          color: 'var(--gold)',
-                                          border: '1px solid var(--gold)',
-                                          padding: '0.2rem 0.5rem',
-                                          fontSize: '0.72rem',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.3rem',
-                                        }}
-                                        title="Ver visor PGN de la partida"
+                                        onClick={() => exportStandingsToCsv(evt.title, eventStandings)}
+                                        className="btn btn--ghost btn--sm"
+                                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
                                       >
-                                        <Eye size={12} />
-                                        <span>PGN</span>
+                                        <Download size={12} />
+                                        <span>Descargar Tabla Oficial (CSV)</span>
                                       </button>
-                                    )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
                       </div>
                     );
                   })()}
+
 
                   <div style={{ borderTop: '1px solid #292929', paddingTop: '1.2rem', marginTop: '1rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                     <div>

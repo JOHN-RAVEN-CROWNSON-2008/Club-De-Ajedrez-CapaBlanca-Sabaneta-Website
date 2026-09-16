@@ -19,13 +19,14 @@ import {
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList, Crown, UserPlus
+  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 import { whatsappService } from '../../services/whatsappService';
 import { AdminLoginView } from '../auth/AdminLoginView';
+import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, loading, logout } = useAuth();
@@ -66,7 +67,7 @@ export const AdminDashboardView: React.FC = () => {
     location: 'CC Aves María, Sabaneta',
     notes: '',
   });
-  const [eventsSubTab, setEventsSubTab] = useState<'tournaments' | 'matches' | 'roster' | 'trophies'>('tournaments');
+  const [eventsSubTab, setEventsSubTab] = useState<'tournaments' | 'matches' | 'standings' | 'roster' | 'trophies'>('tournaments');
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
   const [messages, setMessages] = useState<ContactMessage[]>([
     {
@@ -1345,104 +1346,229 @@ export const AdminDashboardView: React.FC = () => {
           {/* 3. SECCIÓN: TORNEOS & EVENTOS */}
           {activeSection === 'events' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <div>
-                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestión de Torneos</h1>
-                  <p style={{ color: '#888' }}>Crea, edita o retira torneos del calendario público</p>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestión de Torneos & Competencias</h1>
+                  <p style={{ color: '#888' }}>Administración integral de eventos, emparejamientos, clasificaciones en vivo y palmarés histórico</p>
                 </div>
-                <button onClick={() => setShowEventModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Plus size={16} /> Nuevo Torneo
+              </div>
+
+              {/* Pestañas de Navegación del Módulo de Torneos */}
+              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #282828', marginBottom: '1.5rem', overflowX: 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => setEventsSubTab('tournaments')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: eventsSubTab === 'tournaments' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: eventsSubTab === 'tournaments' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Calendar size={16} />
+                  <span>Torneos ({events.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventsSubTab('matches')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: eventsSubTab === 'matches' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: eventsSubTab === 'matches' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Swords size={16} />
+                  <span>Partidas & Emparejamientos ({matches.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventsSubTab('standings')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: eventsSubTab === 'standings' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: eventsSubTab === 'standings' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Trophy size={16} />
+                  <span>Posiciones en Vivo & Desempates</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventsSubTab('roster')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: eventsSubTab === 'roster' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: eventsSubTab === 'roster' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Award size={16} />
+                  <span>Nómina de Preinscritos ({registrations.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEventsSubTab('trophies')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: eventsSubTab === 'trophies' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: eventsSubTab === 'trophies' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Crown size={16} />
+                  <span>Palmarés Histórico ({trophies.length})</span>
                 </button>
               </div>
 
-              {showEventModal && (
-                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
-                  <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Publicar Nuevo Torneo</h3>
-                  <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Título del torneo"
-                        value={newEvent.title}
-                        onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="date"
-                        required
-                        value={newEvent.event_date}
-                        onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
+              {/* Sub-pestaña 1: Torneos & Eventos Convocados */}
+              {eventsSubTab === 'tournaments' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Calendar size={18} />
+                        Torneos en Calendario Público
+                      </h2>
+                      <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>Crea, edita o retira torneos convocados por el Club Capablanca</p>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Ritmo (ej. Blitz 3+2)"
-                        value={newEvent.rhythm}
-                        onChange={(e) => setNewEvent({ ...newEvent, rhythm: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Categoría (ej. Abierto)"
-                        value={newEvent.category}
-                        onChange={(e) => setNewEvent({ ...newEvent, category: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Valor inscripción"
-                        value={newEvent.entry_fee}
-                        onChange={(e) => setNewEvent({ ...newEvent, entry_fee: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
+                    <button onClick={() => setShowEventModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Plus size={16} /> Nuevo Torneo
+                    </button>
+                  </div>
+
+                  {showEventModal && (
+                    <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                      <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Publicar Nuevo Torneo</h3>
+                      <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Título del torneo"
+                            value={newEvent.title}
+                            onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <input
+                            type="date"
+                            required
+                            value={newEvent.event_date}
+                            onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                          <input
+                            type="text"
+                            placeholder="Ritmo (ej. Blitz 3+2)"
+                            value={newEvent.rhythm}
+                            onChange={(e) => setNewEvent({ ...newEvent, rhythm: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Categoría (ej. Abierto)"
+                            value={newEvent.category}
+                            onChange={(e) => setNewEvent({ ...newEvent, category: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Valor inscripción"
+                            value={newEvent.entry_fee}
+                            onChange={(e) => setNewEvent({ ...newEvent, entry_fee: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                        <textarea
+                          placeholder="Descripción y bases del torneo..."
+                          rows={3}
+                          value={newEvent.description}
+                          onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                          style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                          <button type="submit" className="btn btn--primary btn--sm">Guardar y Publicar</button>
+                          <button type="button" onClick={() => setShowEventModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                        </div>
+                      </form>
                     </div>
-                    <textarea
-                      placeholder="Descripción y bases del torneo..."
-                      rows={3}
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                    />
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <button type="submit" className="btn btn--primary btn--sm">Guardar y Publicar</button>
-                      <button type="button" onClick={() => setShowEventModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
-                    </div>
-                  </form>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {events.map((evt) => (
+                      <div key={evt.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.4rem' }}>
+                            <span style={{ background: 'var(--gold)', color: '#000', fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                              {evt.rhythm}
+                            </span>
+                            <h3 style={{ fontSize: '1.15rem', margin: 0 }}>{evt.title}</h3>
+                          </div>
+                          <p style={{ color: '#888', fontSize: '0.85rem', margin: 0 }}>
+                            Fecha: {evt.event_date} · {evt.location} · {evt.entry_fee}
+                          </p>
+                        </div>
+                        <button onClick={() => handleDeleteEvent(evt.id)} className="btn btn--sm" style={{ background: '#2b1212', color: '#ff8a80', border: '1px solid #b71c1c' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {events.map((evt) => (
-                  <div key={evt.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Sub-pestaña 2: Emparejamientos & Resultados de Partidas */}
+              {eventsSubTab === 'matches' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.4rem' }}>
-                        <span style={{ background: 'var(--gold)', color: '#000', fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                          {evt.rhythm}
-                        </span>
-                        <h3 style={{ fontSize: '1.15rem', margin: 0 }}>{evt.title}</h3>
-                      </div>
-                      <p style={{ color: '#888', fontSize: '0.85rem', margin: 0 }}>
-                        Fecha: {evt.event_date} · {evt.location} · {evt.entry_fee}
-                      </p>
-                    </div>
-                    <button onClick={() => handleDeleteEvent(evt.id)} className="btn btn--sm" style={{ background: '#2b1212', color: '#ff8a80', border: '1px solid #b71c1c' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Sub-sección: Emparejamientos & Resultados de Partidas */}
-              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Swords size={20} />
-                      Emparejamientos & Resultados de Partidas
-                    </h2>
+                      <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Swords size={20} />
+                        Emparejamientos & Resultados de Partidas
+                      </h2>
                     <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
                       Asigna tableros, anota resultados oficiales en vivo y carga archivos PGN
                     </p>
@@ -1680,9 +1806,185 @@ export const AdminDashboardView: React.FC = () => {
                   })()}
                 </div>
               </div>
+              )}
 
-              {/* Sub-sección: Nómina de Preinscritos a Torneos */}
-              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
+              {/* Sub-pestaña 3: Tabla de Posiciones & Desempates en Vivo */}
+              {eventsSubTab === 'standings' && (
+                <div>
+                  {(() => {
+                    const targetEventId = selectedTournamentFilter === 'all' ? (events[0]?.id || '') : selectedTournamentFilter;
+                    const targetEvent = events.find((e) => e.id === targetEventId) || events[0];
+                    const eventMatches = matches.filter((m) => m.event_id === (targetEvent?.id || ''));
+                    const standings = calculateTournamentStandings(eventMatches);
+                    const finishedMatches = eventMatches.filter((m) => m.result !== '*');
+
+                    return (
+                      <div>
+                        {/* Header & Controles de Posiciones */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                          <div>
+                            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Trophy size={20} />
+                              Tabla de Posiciones Oficial & Desempates en Vivo
+                            </h2>
+                            <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                              Cálculo automatizado de puntuación oficial y desempate Sonneborn-Berger (SB) para torneos suizos o round-robin
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <select
+                              value={selectedTournamentFilter}
+                              onChange={(e) => setSelectedTournamentFilter(e.target.value)}
+                              style={{ padding: '0.45rem 0.8rem', borderRadius: '6px', background: '#181818', border: '1px solid #333', color: '#fff', fontSize: '0.82rem' }}
+                            >
+                              <option value="all">Torneo: {events[0]?.title || 'Seleccionar'}</option>
+                              {events.map((ev) => (
+                                <option key={ev.id} value={ev.id}>{ev.title}</option>
+                              ))}
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => exportStandingsToCsv(targetEvent?.title || 'Torneo Capablanca', standings)}
+                              disabled={standings.length === 0}
+                              className="btn btn--primary btn--sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                            >
+                              <Download size={14} />
+                              <span>Exportar Clasificación (.csv)</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Métricas del Torneo */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                          <div style={{ background: '#141414', border: '1px solid #282828', borderRadius: '10px', padding: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Torneo Activo</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginTop: '0.2rem' }}>
+                              {targetEvent?.title || 'Sin torneo seleccionado'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--gold)', marginTop: '0.2rem' }}>
+                              Ritmo: {targetEvent?.rhythm || 'N/A'} · {targetEvent?.category || 'General'}
+                            </div>
+                          </div>
+
+                          <div style={{ background: '#141414', border: '1px solid #282828', borderRadius: '10px', padding: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Partidas Disputadas</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--gold)', marginTop: '0.2rem' }}>
+                              {finishedMatches.length} <span style={{ fontSize: '0.85rem', color: '#777', fontWeight: 400 }}>/ {eventMatches.length} pactadas</span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>
+                              {eventMatches.filter((m) => m.result === '*').length} en juego o pendientes
+                            </div>
+                          </div>
+
+                          <div style={{ background: '#141414', border: '1px solid #282828', borderRadius: '10px', padding: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Jugadores Clasificados</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80', marginTop: '0.2rem' }}>
+                              {standings.length}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>
+                              Con partidas computadas
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tabla de Clasificación Oficial */}
+                        {standings.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '3rem 2rem', background: '#131313', borderRadius: '12px', border: '1px solid #242424' }}>
+                            <Trophy size={40} style={{ color: '#444', marginBottom: '1rem' }} />
+                            <h3 style={{ fontSize: '1.1rem', color: '#aaa', margin: '0 0 0.5rem 0' }}>No hay partidas finalizadas aún</h3>
+                            <p style={{ color: '#666', fontSize: '0.85rem', maxWidth: '500px', margin: '0 auto 1.2rem auto' }}>
+                              Para generar la tabla de clasificación y calcular el desempate Sonneborn-Berger, ve a la pestaña de "Partidas & Emparejamientos" y anota los resultados de las mesas (1-0, 0-1 o ½-½).
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setEventsSubTab('matches')}
+                              className="btn btn--sm btn--primary"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                            >
+                              <Swords size={14} /> Ir a Emparejamientos
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ background: '#121212', border: '1px solid #252525', borderRadius: '12px', overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                              <thead>
+                                <tr style={{ background: '#181818', borderBottom: '1px solid #2a2a2a', color: '#888', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em' }}>
+                                  <th style={{ padding: '0.8rem 1rem', width: '60px' }}>Puesto</th>
+                                  <th style={{ padding: '0.8rem 1rem' }}>Deportista</th>
+                                  <th style={{ padding: '0.8rem 0.6rem', textAlign: 'center' }}>PJ</th>
+                                  <th style={{ padding: '0.8rem 0.6rem', textAlign: 'center' }}>PG</th>
+                                  <th style={{ padding: '0.8rem 0.6rem', textAlign: 'center' }}>PE</th>
+                                  <th style={{ padding: '0.8rem 0.6rem', textAlign: 'center' }}>PP</th>
+                                  <th style={{ padding: '0.8rem 0.8rem', textAlign: 'center' }}>Desempate (SB)</th>
+                                  <th style={{ padding: '0.8rem 1rem', textAlign: 'right', color: 'var(--gold)' }}>Puntos Totales</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {standings.map((st) => (
+                                  <tr
+                                    key={st.name}
+                                    style={{
+                                      borderBottom: '1px solid #1f1f1f',
+                                      background: st.rank === 1 ? 'rgba(212,175,55,0.08)' : st.rank <= 3 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                                    }}
+                                  >
+                                    <td style={{ padding: '0.8rem 1rem', fontWeight: 800 }}>
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '50%',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 900,
+                                          background: st.rank === 1 ? '#ffd700' : st.rank === 2 ? '#c0c0c0' : st.rank === 3 ? '#cd7f32' : '#222',
+                                          color: st.rank <= 3 ? '#000' : '#888',
+                                          boxShadow: st.rank === 1 ? '0 0 10px rgba(255,215,0,0.3)' : 'none',
+                                        }}
+                                      >
+                                        {st.rank}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '0.8rem 1rem' }}>
+                                      <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.92rem' }}>
+                                        {st.name}
+                                      </div>
+                                      {st.rank === 1 && (
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--gold)', fontWeight: 600 }}>
+                                          👑 Líder del Torneo
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.8rem 0.6rem', textAlign: 'center', color: '#aaa', fontWeight: 600 }}>{st.played}</td>
+                                    <td style={{ padding: '0.8rem 0.6rem', textAlign: 'center', color: '#4ade80', fontWeight: 700 }}>{st.won}</td>
+                                    <td style={{ padding: '0.8rem 0.6rem', textAlign: 'center', color: '#facc15', fontWeight: 700 }}>{st.drawn}</td>
+                                    <td style={{ padding: '0.8rem 0.6rem', textAlign: 'center', color: '#f87171', fontWeight: 700 }}>{st.lost}</td>
+                                    <td style={{ padding: '0.8rem 0.8rem', textAlign: 'center', color: '#bbb', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                                      {st.sonnebornBerger.toFixed(2)}
+                                    </td>
+                                    <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontWeight: 900, color: 'var(--gold)', fontSize: '1.05rem' }}>
+                                      {st.points}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Sub-pestaña 4: Nómina de Preinscritos a Torneos */}
+              {eventsSubTab === 'roster' && (
+                <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                   <div>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1825,9 +2127,11 @@ export const AdminDashboardView: React.FC = () => {
                   </table>
                 </div>
               </div>
+              )}
 
-              {/* Sub-sección: Cuadro de Honor & Palmarés Histórico */}
-              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
+              {/* Sub-pestaña 5: Cuadro de Honor & Palmarés Histórico */}
+              {eventsSubTab === 'trophies' && (
+                <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                   <div>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2002,6 +2306,7 @@ export const AdminDashboardView: React.FC = () => {
                   </table>
                 </div>
               </div>
+              )}
             </div>
           )}
 
