@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroSlider } from '../../components/public/HeroSlider';
 import { Ticker } from '../../components/public/Ticker';
@@ -6,13 +6,47 @@ import { StatsSection } from '../../components/public/StatsSection';
 import { InstagramWall } from '../../components/public/InstagramWall';
 import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle';
 import { INITIAL_EVENTS, INITIAL_POSTS, INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
-import { ClubAnnouncement } from '../../types/database';
+import { ClubAnnouncement, ClubEvent, Post } from '../../types/database';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle, Megaphone, X } from 'lucide-react';
 
 export const HomeView: React.FC = () => {
-  const upcomingEvents = INITIAL_EVENTS.slice(0, 2);
-  const latestPosts = INITIAL_POSTS.slice(0, 2);
+  const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>(INITIAL_EVENTS.slice(0, 2));
+  const [latestPosts, setLatestPosts] = useState<Post[]>(INITIAL_POSTS.slice(0, 2));
   const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(INITIAL_ANNOUNCEMENTS[0] || null);
+
+  useEffect(() => {
+    async function loadHomeData() {
+      if (!isSupabaseConfigured()) return;
+      try {
+        const { data: evData } = await supabase
+          .from('events')
+          .select('*')
+          .order('event_date', { ascending: true })
+          .limit(2);
+        if (evData && evData.length > 0) setUpcomingEvents(evData as ClubEvent[]);
+
+        const { data: postData } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('published', true)
+          .order('created_at', { ascending: false })
+          .limit(2);
+        if (postData && postData.length > 0) setLatestPosts(postData as Post[]);
+
+        const { data: annData } = await supabase
+          .from('club_announcements')
+          .select('*')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (annData && annData.length > 0) setActiveBanner(annData[0] as ClubAnnouncement);
+      } catch (err) {
+        console.warn('Carga dinámica en HomeView:', err);
+      }
+    }
+    loadHomeData();
+  }, []);
 
 
   const faqs = [
