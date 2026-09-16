@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroSlider } from '../../components/public/HeroSlider';
 import { Ticker } from '../../components/public/Ticker';
 import { StatsSection } from '../../components/public/StatsSection';
 import { InstagramWall } from '../../components/public/InstagramWall';
-import { INITIAL_EVENTS, INITIAL_POSTS } from '../../lib/initialData';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle } from 'lucide-react';
+import { INITIAL_EVENTS, INITIAL_POSTS, INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
+import { ClubAnnouncement } from '../../types/database';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle, Megaphone, X } from 'lucide-react';
 
 export const HomeView: React.FC = () => {
   const upcomingEvents = INITIAL_EVENTS.slice(0, 2);
   const latestPosts = INITIAL_POSTS.slice(0, 2);
+  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(INITIAL_ANNOUNCEMENTS[0] || null);
+
 
   const faqs = [
     {
@@ -32,8 +35,42 @@ export const HomeView: React.FC = () => {
 
   return (
     <div>
+      {/* Banner de Anuncio Prioritario si está activo */}
+      {activeBanner && activeBanner.active && (
+        <div
+          style={{
+            background: activeBanner.level === 'urgent' ? '#b71c1c' : activeBanner.level === 'warning' ? '#e65100' : '#141414',
+            borderBottom: '2px solid var(--gold)',
+            color: '#fff',
+            padding: '0.65rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.9rem',
+            position: 'relative',
+            zIndex: 100,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', margin: '0 auto' }}>
+            <Megaphone size={18} color="var(--gold)" />
+            <span>
+              <strong>{activeBanner.title}:</strong> {activeBanner.message}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveBanner(null)}
+            style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0.2rem' }}
+            aria-label="Cerrar aviso"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* 1. Hero con Slider y ADN */}
       <HeroSlider />
+
 
       {/* 2. Ticker animado */}
       <Ticker />

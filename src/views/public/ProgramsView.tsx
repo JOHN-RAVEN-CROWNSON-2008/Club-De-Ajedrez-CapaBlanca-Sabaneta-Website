@@ -144,6 +144,40 @@ export const ProgramsView: React.FC = () => {
         </div>
       </section>
 
+      {/* Cronograma Semanal de Clases */}
+      <section className="section section--dark" style={{ paddingBlock: '4rem' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="pill pill--gold">Horarios Oficiales</span>
+            <h2 className="display display--gold" style={{ marginTop: '0.8rem' }}>
+              Cronograma Semanal de Entrenamientos
+            </h2>
+            <p style={{ color: '#aaa', marginTop: '0.5rem' }}>
+              Clases regulares en nuestra sede del CC Aves María y sesiones virtuales de acompañamiento
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {[
+              { cat: 'Iniciación Infantil (4 a 8 años)', day: 'Martes y Jueves', time: '4:00 PM - 5:30 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
+              { cat: 'Semillero Sub-12', day: 'Miércoles y Viernes', time: '4:00 PM - 6:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
+              { cat: 'Desarrollo Juvenil Sub-16', day: 'Lunes y Miércoles', time: '6:00 PM - 8:00 PM', mod: 'Híbrida', place: 'Sede / Zoom' },
+              { cat: 'Adultos & Aficionados', day: 'Sábados', time: '10:00 AM - 1:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
+              { cat: 'Alta Competencia', day: 'Sábados', time: '2:00 PM - 6:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
+            ].map((item, idx) => (
+              <div key={idx} style={{ background: '#141414', border: '1px solid #282828', borderRadius: '12px', padding: '1.5rem' }}>
+                <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800, textTransform: 'uppercase' }}>
+                  {item.mod}
+                </span>
+                <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0.6rem 0 0.3rem' }}>{item.cat}</h3>
+                <p style={{ color: 'var(--gold)', fontWeight: 600, fontSize: '0.95rem', margin: '0.2rem 0' }}>{item.day} · {item.time}</p>
+                <p style={{ color: '#777', fontSize: '0.85rem', margin: 0 }}>{item.place}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Banner de asesoría */}
       <section className="section section--gold" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
         <div className="wrap-narrow">
@@ -167,3 +201,4 @@ export const ProgramsView: React.FC = () => {
     </div>
   );
 };
+

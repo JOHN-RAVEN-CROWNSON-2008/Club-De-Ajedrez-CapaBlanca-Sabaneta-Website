@@ -160,3 +160,16 @@ export interface ClubAnnouncement {
   target: 'all' | 'public' | 'members';
   created_at: string;
 }
+
+export interface TournamentMatch {
+  id: string;
+  event_id: string;
+  round: number;
+  board_number: number;
+  white_player: string;
+  black_player: string;
+  result: '1-0' | '0-1' | '1/2-1/2' | '*';
+  pgn?: string;
+  created_at?: string;
+}
+

@@ -263,7 +263,22 @@ CREATE TABLE IF NOT EXISTS public.club_announcements (
 );
 
 -- ==============================================================================
--- 14. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
+-- 14. TABLA: tournament_matches (Emparejamientos y Resultados de Torneos)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.tournament_matches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+    round INTEGER NOT NULL DEFAULT 1,
+    board_number INTEGER NOT NULL DEFAULT 1,
+    white_player TEXT NOT NULL,
+    black_player TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT '*' CHECK (result IN ('1-0', '0-1', '1/2-1/2', '*')),
+    pgn TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 15. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
@@ -276,6 +291,8 @@ ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.membership_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
+
 
 -- ==============================================================================
 -- 15. POLÍTICAS RLS
@@ -366,9 +383,17 @@ CREATE POLICY "Anuncios lectura publica" ON public.club_announcements FOR SELECT
 DROP POLICY IF EXISTS "Admins gestionan anuncios" ON public.club_announcements;
 CREATE POLICY "Admins gestionan anuncios" ON public.club_announcements FOR ALL USING (public.is_admin());
 
+-- Tournament Matches
+DROP POLICY IF EXISTS "Emparejamientos lectura publica" ON public.tournament_matches;
+CREATE POLICY "Emparejamientos lectura publica" ON public.tournament_matches FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "Admins gestionan emparejamientos" ON public.tournament_matches;
+CREATE POLICY "Admins gestionan emparejamientos" ON public.tournament_matches FOR ALL USING (public.is_admin());
+
 -- ==============================================================================
 -- 16. SEED DATA (DATOS INICIALES COMPLETOS)
 -- ==============================================================================
+
 
 INSERT INTO public.site_settings (id, telefono, whatsapp, sede, ciudad, instagram)
 VALUES (
