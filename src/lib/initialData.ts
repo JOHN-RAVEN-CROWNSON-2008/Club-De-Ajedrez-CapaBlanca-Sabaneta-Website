@@ -1,4 +1,4 @@
-import { SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile, MembershipPayment, ClassSchedule, ClubAnnouncement } from '../types/database';
+import { SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile, MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
   id: 'general',
@@ -255,3 +255,27 @@ export const MOCK_MEMBER_PROFILE: UserProfile = {
   estado: 'active',
   created_at: '2025-02-10T00:00:00Z',
 };
+
+export const INITIAL_MATCHES: TournamentMatch[] = [
+  {
+    id: 'mat-1',
+    event_id: 'ev-1',
+    round: 1,
+    board_number: 1,
+    white_player: 'Santiago Gómez (1580)',
+    black_player: 'Andrés Arboleda (1520)',
+    result: '1-0',
+    pgn: '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 c6 12. cxb5 axb5 13. Nc3 Bb7 14. Bg5 b4 15. Nb1 h6 16. Bh4 c5 17. dxe5 Nxe4 18. Bxe7 Qxe7 19. exd6 Qf6 20. Nbd2 Nxd6 21. Nc4 Nxc4 22. Bxc4 Nb6 23. Ne5 Rae8 24. Bxf7+ Rxf7 25. Nxf7 Rxe1+ 26. Qxe1 Kxf7 27. Qe3 Qg5 28. Qxg5 hxg5 29. b3 Ke6 30. a3 Kd6 31. axb4 cxb4 32. Ra5 Nd5 33. f3 Bc8 34. Kf2 Bf5 35. Ra7 g6 36. Ra6+ Kc5 37. Ke1 Bc2 38. Kd2 Bxb3 39. Rxg6 Bc4 40. Rxg5 b3 41. h4 Kb4 42. Rg8 Nb6 43. Rb8 Ka5 44. h5 Bf7 45. h6 Bg6 46. Kc3 1-0',
+  },
+  {
+    id: 'mat-2',
+    event_id: 'ev-1',
+    round: 1,
+    board_number: 2,
+    white_player: 'Mateo Valencia (1640)',
+    black_player: 'David Rendón (1490)',
+    result: '1/2-1/2',
+    pgn: '1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Be7 5. Bg5 O-O 6. e3 h6 7. Bh4 b6 8. cxd5 Nxd5 9. Bxe7 Qxe7 10. Nxd5 exd5 11. Rc1 Be6 12. Qa4 c5 13. Qa3 Rc8 14. Be2 Nd7 15. O-O Kf8 16. Ba6 Rc7 17. Rc3 c4 18. Qxe7+ Kxe7 19. b3 Nb8 20. Bb5 a6 21. Ba4 b5 22. bxc4 bxa4 23. c5 Nc6 24. Ra3 Rb8 25. Rxa4 a5 26. Ra3 Rb2 27. h3 Rcb7 28. Rc1 Rb1 29. Rxb1 Rxb1+ 30. Kh2 Rb2 31. Kg3 f6 32. Ne1 Bf5 33. Nd3 Bxd3 34. Rxd3 Rxa2 35. Rb3 Nb4 36. f3 Kd7 37. e4 Kc6 38. exd5+ Kxd5 39. Re3 Kxd4 40. Re7 g5 41. Re6 Kxc5 42. Rxf6 a4 43. Rxh6 a3 44. Rg6 Kb5 45. Rxg5+ Ka4 46. Rg8 Rd2 47. Ra8+ Kb3 48. h4 a2 49. h5 Rd4 50. Rxa2 Kxa2 51. f4 Kb3 52. h6 Rd6 53. Kg4 Rxh6 54. Kg5 Rh8 55. g4 Kc4 56. f5 Kd5 57. Kf6 Kd6 58. g5 Nd5+ 59. Kg7 Rh1 60. f6 Rg1 61. g6 Nf4 62. f7 Rxg6+ 63. Kh7 Rf6 64. Kg7 Ke7 65. f8=Q+ Rxf8 1/2-1/2',
+  }
+];
+

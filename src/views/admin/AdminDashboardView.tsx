@@ -4,17 +4,20 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
-  MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_ANNOUNCEMENTS
+  MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
+  INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
-  MembershipPayment, ClassSchedule, ClubAnnouncement
+  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
-  CreditCard, Calendar, Megaphone, Download, Search, Check, X
+  CreditCard, Calendar, Megaphone, Download, Search, Check, X,
+  Swords, Eye
 } from 'lucide-react';
+import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, logout } = useAuth();
@@ -26,6 +29,7 @@ export const AdminDashboardView: React.FC = () => {
 
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
+  const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [members, setMembers] = useState<UserProfile[]>([MOCK_ADMIN_PROFILE, MOCK_MEMBER_PROFILE]);
@@ -78,6 +82,27 @@ export const AdminDashboardView: React.FC = () => {
     title: '', message: '', level: 'info' as const, target: 'all' as const,
   });
 
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [selectedTournamentFilter, setSelectedTournamentFilter] = useState<string>('all');
+  const [newMatch, setNewMatch] = useState<{
+    event_id: string;
+    round: number;
+    board_number: number;
+    white_player: string;
+    black_player: string;
+    result: '1-0' | '0-1' | '1/2-1/2' | '*';
+    pgn: string;
+  }>({
+    event_id: '',
+    round: 1,
+    board_number: 1,
+    white_player: '',
+    black_player: '',
+    result: '*',
+    pgn: '',
+  });
+  const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
+
   // Validar permisos
   useEffect(() => {
     if (!user) {
@@ -98,6 +123,9 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: evts } = await supabase.from('events').select('*').order('created_at', { ascending: false });
         if (evts) setEvents(evts as ClubEvent[]);
+
+        const { data: mtchs } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
+        if (mtchs && mtchs.length > 0) setMatches(mtchs as TournamentMatch[]);
 
         const { data: pst } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
         if (pst) setPosts(pst as Post[]);
@@ -174,6 +202,60 @@ export const AdminDashboardView: React.FC = () => {
     }
     setEvents(events.filter((e) => e.id !== id));
     triggerNotice('Torneo eliminado');
+  };
+
+  // Emparejamientos & Partidas de Torneo
+  const handleCreateMatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const eventId = newMatch.event_id || (events[0]?.id ?? 'ev-1');
+    const matchItem: TournamentMatch = {
+      id: 'mat-' + Date.now(),
+      event_id: eventId,
+      round: Number(newMatch.round) || 1,
+      board_number: Number(newMatch.board_number) || 1,
+      white_player: newMatch.white_player,
+      black_player: newMatch.black_player,
+      result: newMatch.result,
+      pgn: newMatch.pgn ? newMatch.pgn.trim() : undefined,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('tournament_matches').insert(matchItem);
+      } catch (err) {
+        console.error('Error guardando partida en Supabase:', err);
+      }
+    }
+
+    setMatches([matchItem, ...matches]);
+    setShowMatchModal(false);
+    setNewMatch({ event_id: '', round: 1, board_number: 1, white_player: '', black_player: '', result: '*', pgn: '' });
+    triggerNotice('Partida registrada en el sistema');
+  };
+
+  const handleUpdateMatchResult = async (id: string, result: '1-0' | '0-1' | '1/2-1/2' | '*') => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('tournament_matches').update({ result }).eq('id', id);
+      } catch (err) {
+        console.error('Error actualizando resultado en Supabase:', err);
+      }
+    }
+    setMatches(matches.map((m) => (m.id === id ? { ...m, result } : m)));
+    triggerNotice(`Resultado actualizado a ${result}`);
+  };
+
+  const handleDeleteMatch = async (id: string) => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('tournament_matches').delete().eq('id', id);
+      } catch (err) {
+        console.error('Error eliminando partida en Supabase:', err);
+      }
+    }
+    setMatches(matches.filter((m) => m.id !== id));
+    triggerNotice('Partida eliminada');
   };
 
   // Post
@@ -646,6 +728,252 @@ export const AdminDashboardView: React.FC = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+
+              {/* Sub-sección: Emparejamientos & Resultados de Partidas */}
+              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Swords size={20} />
+                      Emparejamientos & Resultados de Partidas
+                    </h2>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Asigna tableros, anota resultados oficiales en vivo y carga archivos PGN
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Selector de torneo */}
+                    <select
+                      value={selectedTournamentFilter}
+                      onChange={(e) => setSelectedTournamentFilter(e.target.value)}
+                      style={{ padding: '0.45rem 0.8rem', borderRadius: '6px', background: '#181818', border: '1px solid #333', color: '#fff', fontSize: '0.82rem' }}
+                    >
+                      <option value="all">Todos los Torneos</option>
+                      {events.map((ev) => (
+                        <option key={ev.id} value={ev.id}>{ev.title}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={() => setShowMatchModal(true)}
+                      className="btn btn--primary btn--sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <Plus size={16} /> Registrar Partida / Mesa
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal de Registro de Partida */}
+                {showMatchModal && (
+                  <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '1.8rem', marginBottom: '1.8rem' }}>
+                    <h3 style={{ color: 'var(--gold)', marginBottom: '1rem', fontSize: '1.1rem' }}>Registrar Emparejamiento / Partida</h3>
+                    <form onSubmit={handleCreateMatch} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.8rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Torneo</label>
+                          <select
+                            value={newMatch.event_id || (events[0]?.id ?? '')}
+                            onChange={(e) => setNewMatch({ ...newMatch, event_id: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          >
+                            {events.map((ev) => (
+                              <option key={ev.id} value={ev.id}>{ev.title}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Ronda</label>
+                          <input
+                            type="number"
+                            min={1}
+                            required
+                            value={newMatch.round}
+                            onChange={(e) => setNewMatch({ ...newMatch, round: Number(e.target.value) })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Mesa / Tablero</label>
+                          <input
+                            type="number"
+                            min={1}
+                            required
+                            value={newMatch.board_number}
+                            onChange={(e) => setNewMatch({ ...newMatch, board_number: Number(e.target.value) })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '0.8rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Jugador Blancas</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Santiago Gómez (1580)"
+                            value={newMatch.white_player}
+                            onChange={(e) => setNewMatch({ ...newMatch, white_player: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Jugador Negras</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Andrés Arboleda (1520)"
+                            value={newMatch.black_player}
+                            onChange={(e) => setNewMatch({ ...newMatch, black_player: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Resultado</label>
+                          <select
+                            value={newMatch.result}
+                            onChange={(e) => setNewMatch({ ...newMatch, result: e.target.value as any })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.85rem' }}
+                          >
+                            <option value="*">* (En juego)</option>
+                            <option value="1-0">1 - 0 (Blancas)</option>
+                            <option value="0-1">0 - 1 (Negras)</option>
+                            <option value="1/2-1/2">½ - ½ (Tablas)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>Partida PGN (Opcional)</label>
+                        <textarea
+                          placeholder="Pega la notación PGN oficial de la partida (ej. 1. e4 e5 2. Nf3 Nc6...)"
+                          rows={3}
+                          value={newMatch.pgn}
+                          onChange={(e) => setNewMatch({ ...newMatch, pgn: e.target.value })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.82rem', fontFamily: 'monospace' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.8rem' }}>
+                        <button type="submit" className="btn btn--primary btn--sm">Guardar Partida</button>
+                        <button type="button" onClick={() => setShowMatchModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Lista de Partidas Registradas */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {(() => {
+                    const filteredMatches = matches.filter((m) =>
+                      selectedTournamentFilter === 'all' || m.event_id === selectedTournamentFilter
+                    );
+
+                    if (filteredMatches.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '2rem', background: '#141414', borderRadius: '8px', border: '1px solid #222', color: '#777', fontSize: '0.9rem' }}>
+                          No hay partidas registradas para este torneo aún.
+                        </div>
+                      );
+                    }
+
+                    return filteredMatches.map((m) => {
+                      const parentEvent = events.find((e) => e.id === m.event_id);
+
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            background: '#131313',
+                            border: '1px solid #252525',
+                            borderRadius: '10px',
+                            padding: '1rem 1.25rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <span style={{ background: '#222', color: 'var(--gold)', fontSize: '0.72rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                                Mesa {m.board_number} · Ronda {m.round}
+                              </span>
+                              <span style={{ color: '#777', fontSize: '0.78rem' }}>
+                                {parentEvent?.title || 'Torneo'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#eee', marginTop: '0.2rem' }}>
+                              <span>♔ {m.white_player}</span>
+                              <span style={{ color: 'var(--gold)', margin: '0 0.5rem', fontWeight: 800 }}>vs</span>
+                              <span>♚ {m.black_player}</span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            {/* Botones rápidos de actualización de resultado */}
+                            <div style={{ display: 'flex', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #333', overflow: 'hidden' }}>
+                              {(['1-0', '1/2-1/2', '0-1', '*'] as const).map((res) => (
+                                <button
+                                  key={res}
+                                  type="button"
+                                  onClick={() => handleUpdateMatchResult(m.id, res)}
+                                  style={{
+                                    background: m.result === res ? 'var(--gold)' : 'transparent',
+                                    color: m.result === res ? '#000' : '#888',
+                                    fontWeight: m.result === res ? 800 : 500,
+                                    border: 'none',
+                                    padding: '0.3rem 0.6rem',
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                  }}
+                                  title={`Marcar ${res}`}
+                                >
+                                  {res === '1/2-1/2' ? '½-½' : res}
+                                </button>
+                              ))}
+                            </div>
+
+                            {m.pgn && (
+                              <button
+                                type="button"
+                                onClick={() => setActivePgnMatch(m)}
+                                className="btn btn--sm btn--ghost"
+                                style={{
+                                  border: '1px solid var(--gold)',
+                                  color: 'var(--gold)',
+                                  padding: '0.3rem 0.6rem',
+                                  fontSize: '0.75rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                }}
+                                title="Ver visor interactivo PGN"
+                              >
+                                <Eye size={13} />
+                                <span>Ver PGN</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeleteMatch(m.id)}
+                              className="btn btn--sm"
+                              style={{ background: '#291212', color: '#ff8a80', border: '1px solid #b71c1c', padding: '0.35rem 0.6rem' }}
+                              title="Eliminar partida"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
           )}
@@ -1191,6 +1519,19 @@ export const AdminDashboardView: React.FC = () => {
 
         </main>
       </div>
+
+      {/* Modal Visor de Partida PGN para Admin */}
+      {activePgnMatch && (
+        <PgnViewerModal
+          isOpen={true}
+          onClose={() => setActivePgnMatch(null)}
+          title={`Partida Mesa ${activePgnMatch.board_number} (Ronda ${activePgnMatch.round})`}
+          whitePlayer={activePgnMatch.white_player}
+          blackPlayer={activePgnMatch.black_player}
+          result={activePgnMatch.result}
+          pgn={activePgnMatch.pgn || ''}
+        />
+      )}
     </div>
   );
 };

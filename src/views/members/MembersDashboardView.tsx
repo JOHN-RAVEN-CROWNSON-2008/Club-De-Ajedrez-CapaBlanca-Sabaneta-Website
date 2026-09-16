@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES } from '../../lib/initialData';
-import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule } from '../../types/database';
+import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES } from '../../lib/initialData';
+import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch } from '../../types/database';
 import { resendService } from '../../services/resendService';
 import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
-  Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus
+  Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
+  Swords, Eye, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, logout, updateProfile, isConfigured } = useAuth();
@@ -17,11 +19,21 @@ export const MembersDashboardView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'documentos' | 'torneos' | 'pagos' | 'horarios' | 'perfil'>('documentos');
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
+  const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [myRegistrations, setMyRegistrations] = useState<string[]>([]);
   const [selectedDocCategory, setSelectedDocCategory] = useState<string>('all');
   const [docSearch, setDocSearch] = useState<string>('');
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [pgnModalData, setPgnModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    whitePlayer: string;
+    blackPlayer: string;
+    result: string;
+    pgn: string;
+  } | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     nombre: '',
@@ -80,6 +92,9 @@ export const MembersDashboardView: React.FC = () => {
 
         const { data: schData } = await supabase.from('class_schedules').select('*');
         if (schData && schData.length > 0) setSchedules(schData as ClassSchedule[]);
+
+        const { data: matchData } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
+        if (matchData && matchData.length > 0) setMatches(matchData as TournamentMatch[]);
 
         if (user) {
           const { data: payData } = await supabase
@@ -378,18 +393,46 @@ export const MembersDashboardView: React.FC = () => {
                     </p>
                   </div>
 
-                  <div style={{ borderTop: '1px solid #252525', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ borderTop: '1px solid #252525', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.75rem', color: '#666' }}>
                       Descargas: {doc.downloads_count}
                     </span>
-                    <button
-                      onClick={() => alert(`Iniciando descarga: ${doc.title} (${doc.file_type.toUpperCase()})`)}
-                      className="btn btn--primary btn--sm"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                    >
-                      <Download size={14} />
-                      <span>Descargar</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      {doc.file_type === 'pgn' && (
+                        <button
+                          type="button"
+                          onClick={() => setPgnModalData({
+                            isOpen: true,
+                            title: doc.title,
+                            whitePlayer: 'José Raúl Capablanca',
+                            blackPlayer: 'Frank Marshall',
+                            result: '1-0',
+                            pgn: '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Be3 Bg4 16. Qd3 Rae8 17. Nd2 Re6 18. a4 bxa4 19. Rxa4 f5 20. Qf1 Qh5 21. f4 Rfe8 22. Bxd5 cxd5 23. Qf2 g5 24. fxg5 f4 25. gxf4 Bxf4 26. Qxf4 Bh3 27. Nf1 Re4 28. Qf2 Rf8 29. Qg3 Rg4 30. Rxa6 Rxg3+ 31. Nxg3 Qf3 32. Re2 Qf1+ 33. Nxf1 Rxf1# 0-1',
+                          })}
+                          className="btn btn--sm"
+                          style={{
+                            background: '#1f1a10',
+                            color: 'var(--gold)',
+                            border: '1px solid var(--gold)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          <Swords size={13} />
+                          <span>Ver Partida</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => alert(`Iniciando descarga: ${doc.title} (${doc.file_type.toUpperCase()})`)}
+                        className="btn btn--primary btn--sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <Download size={14} />
+                        <span>Descargar</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -454,9 +497,111 @@ export const MembersDashboardView: React.FC = () => {
                           <span>{evt.location}</span>
                         </div>
                       </div>
+                      {/* Emparejamientos & Resultados */}
+                      {(() => {
+                        const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                        const isExpanded = expandedEventId === evt.id;
+
+                        return (
+                          <div style={{ marginTop: '1rem', borderTop: '1px solid #252525', paddingTop: '0.8rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedEventId(isExpanded ? null : evt.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--gold)',
+                                fontSize: '0.82rem',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                width: '100%',
+                                cursor: 'pointer',
+                                padding: '0.2rem 0',
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Swords size={15} />
+                                Emparejamientos & Resultados ({eventMatches.length})
+                              </span>
+                              {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                            </button>
+
+                            {isExpanded && (
+                              <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {eventMatches.length === 0 ? (
+                                  <p style={{ fontSize: '0.78rem', color: '#777', fontStyle: 'italic', margin: 0 }}>
+                                    Emparejamientos pendientes de publicación para este torneo.
+                                  </p>
+                                ) : (
+                                  eventMatches.map((m) => (
+                                    <div
+                                      key={m.id}
+                                      style={{
+                                        background: '#111',
+                                        border: '1px solid #292929',
+                                        borderRadius: '6px',
+                                        padding: '0.5rem 0.7rem',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', flex: 1 }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#888' }}>
+                                          Mesa {m.board_number} · Ronda {m.round}
+                                        </div>
+                                        <div style={{ fontSize: '0.78rem', color: '#eee' }}>
+                                          {m.white_player} <span style={{ color: 'var(--gold)', fontWeight: 700 }}>vs</span> {m.black_player}
+                                        </div>
+                                      </div>
+
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span style={{ background: '#222', color: 'var(--gold)', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                          {m.result}
+                                        </span>
+                                        {m.pgn && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setPgnModalData({
+                                              isOpen: true,
+                                              title: `Partida Mesa ${m.board_number} (Ronda ${m.round})`,
+                                              whitePlayer: m.white_player,
+                                              blackPlayer: m.black_player,
+                                              result: m.result,
+                                              pgn: m.pgn || '',
+                                            })}
+                                            className="btn btn--sm"
+                                            style={{
+                                              background: '#1e1e1e',
+                                              color: 'var(--gold)',
+                                              border: '1px solid var(--gold)',
+                                              padding: '0.15rem 0.4rem',
+                                              fontSize: '0.7rem',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.25rem',
+                                            }}
+                                            title="Ver visor PGN"
+                                          >
+                                            <Eye size={12} />
+                                            <span>PGN</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    <div style={{ borderTop: '1px solid #252525', paddingTop: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ borderTop: '1px solid #252525', paddingTop: '1.2rem', marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--gold)' }}>{evt.entry_fee}</span>
                       <button
                         onClick={() => handleRegisterTournament(evt)}
@@ -778,6 +923,19 @@ export const MembersDashboardView: React.FC = () => {
         )}
 
       </div>
+
+      {/* Modal Visor de Partidas PGN */}
+      {pgnModalData && (
+        <PgnViewerModal
+          isOpen={pgnModalData.isOpen}
+          onClose={() => setPgnModalData(null)}
+          title={pgnModalData.title}
+          whitePlayer={pgnModalData.whitePlayer}
+          blackPlayer={pgnModalData.blackPlayer}
+          result={pgnModalData.result}
+          pgn={pgnModalData.pgn}
+        />
+      )}
     </div>
   );
 };

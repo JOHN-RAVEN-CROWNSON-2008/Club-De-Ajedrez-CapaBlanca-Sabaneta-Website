@@ -1,43 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_EVENTS } from '../../lib/initialData';
-import { ClubEvent } from '../../types/database';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck } from 'lucide-react';
+import { INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
+import { ClubEvent, TournamentMatch } from '../../types/database';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 
 export const TournamentsView: React.FC = () => {
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
+  const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
 
   useEffect(() => {
-    async function loadEvents() {
+    async function loadData() {
       if (!isSupabaseConfigured()) {
         setEvents(INITIAL_EVENTS);
+        setMatches(INITIAL_MATCHES);
         setLoading(false);
         return;
       }
 
       try {
-        const { data, error } = await supabase
+        const { data: evts } = await supabase
           .from('events')
           .select('*')
           .order('event_date', { ascending: true });
 
-        if (error || !data || data.length === 0) {
-          setEvents(INITIAL_EVENTS);
+        if (evts && evts.length > 0) {
+          setEvents(evts as ClubEvent[]);
         } else {
-          setEvents(data as ClubEvent[]);
+          setEvents(INITIAL_EVENTS);
+        }
+
+        const { data: mtchs } = await supabase
+          .from('tournament_matches')
+          .select('*')
+          .order('board_number', { ascending: true });
+
+        if (mtchs && mtchs.length > 0) {
+          setMatches(mtchs as TournamentMatch[]);
+        } else {
+          setMatches(INITIAL_MATCHES);
         }
       } catch (err) {
-        console.error('Error al cargar torneos de Supabase:', err);
+        console.error('Error al cargar datos de torneos de Supabase:', err);
         setEvents(INITIAL_EVENTS);
+        setMatches(INITIAL_MATCHES);
       } finally {
         setLoading(false);
       }
     }
 
-    loadEvents();
+    loadData();
   }, []);
 
   const filteredEvents = events.filter((ev) => {
@@ -148,7 +165,116 @@ export const TournamentsView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ borderTop: '1px solid #292929', paddingTop: '1.2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                  {/* Sección Desplegable de Emparejamientos & Resultados */}
+                  {(() => {
+                    const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                    const isExpanded = expandedEventId === evt.id;
+
+                    return (
+                      <div style={{ marginTop: '1.2rem', borderTop: '1px solid #252525', paddingTop: '1rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEventId(isExpanded ? null : evt.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--gold)',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            cursor: 'pointer',
+                            padding: '0.2rem 0',
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Swords size={16} />
+                            Emparejamientos & Resultados ({eventMatches.length})
+                          </span>
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            {eventMatches.length === 0 ? (
+                              <p style={{ fontSize: '0.8rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '0.5rem 0' }}>
+                                Los emparejamientos de la ronda se publicarán 15 minutos antes de la hora pactada.
+                              </p>
+                            ) : (
+                              eventMatches.map((m) => (
+                                <div
+                                  key={m.id}
+                                  style={{
+                                    background: '#111',
+                                    border: '1px solid #292929',
+                                    borderRadius: '8px',
+                                    padding: '0.6rem 0.8rem',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: '0.6rem',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1 }}>
+                                    <div style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>
+                                      Mesa {m.board_number} · Ronda {m.round}
+                                    </div>
+                                    <div style={{ fontSize: '0.82rem', color: '#eee' }}>
+                                      <span>{m.white_player}</span>
+                                      <span style={{ color: 'var(--gold)', margin: '0 0.3rem', fontWeight: 700 }}>vs</span>
+                                      <span>{m.black_player}</span>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span
+                                      style={{
+                                        background: '#222',
+                                        border: '1px solid #333',
+                                        color: 'var(--gold)',
+                                        fontWeight: 800,
+                                        fontSize: '0.78rem',
+                                        padding: '0.2rem 0.5rem',
+                                        borderRadius: '4px',
+                                      }}
+                                    >
+                                      {m.result}
+                                    </span>
+
+                                    {m.pgn && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setActivePgnMatch(m)}
+                                        className="btn btn--sm"
+                                        style={{
+                                          background: '#1e1e1e',
+                                          color: 'var(--gold)',
+                                          border: '1px solid var(--gold)',
+                                          padding: '0.2rem 0.5rem',
+                                          fontSize: '0.72rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem',
+                                        }}
+                                        title="Ver visor PGN de la partida"
+                                      >
+                                        <Eye size={12} />
+                                        <span>PGN</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{ borderTop: '1px solid #292929', paddingTop: '1.2rem', marginTop: '1rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Inscripción</div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--gold)' }}>{evt.entry_fee}</div>
@@ -175,6 +301,19 @@ export const TournamentsView: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Modal Visor de Partida PGN */}
+      {activePgnMatch && (
+        <PgnViewerModal
+          isOpen={true}
+          onClose={() => setActivePgnMatch(null)}
+          title={`Partida Mesa ${activePgnMatch.board_number} (Ronda ${activePgnMatch.round})`}
+          whitePlayer={activePgnMatch.white_player}
+          blackPlayer={activePgnMatch.black_player}
+          result={activePgnMatch.result}
+          pgn={activePgnMatch.pgn || ''}
+        />
+      )}
     </div>
   );
 };
