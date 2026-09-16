@@ -29,6 +29,7 @@ import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthlet
 import { DatabaseDiagnosticModal } from '../../components/common/DatabaseDiagnosticModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { TournamentPairingModal } from '../../components/common/TournamentPairingModal';
+import { ApplicationDetailModal } from '../../components/common/ApplicationDetailModal';
 import { PairingAthlete } from '../../lib/tournamentPairings';
 import { whatsappService } from '../../services/whatsappService';
 import { AdminLoginView } from '../auth/AdminLoginView';
@@ -155,6 +156,7 @@ export const AdminDashboardView: React.FC = () => {
   const [showDbDiagnosticModal, setShowDbDiagnosticModal] = useState(false);
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
   const [showPairingModal, setShowPairingModal] = useState(false);
+  const [selectedApplicationForDetail, setSelectedApplicationForDetail] = useState<MembershipApplication | null>(null);
 
   // Validar permisos
   useEffect(() => {
@@ -3230,6 +3232,18 @@ export const AdminDashboardView: React.FC = () => {
 
                                 <td style={{ padding: '1rem', textAlign: 'right' }}>
                                   <div style={{ display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                    {/* Botón Ver Expediente Completo */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedApplicationForDetail(app)}
+                                      className="btn btn--sm"
+                                      style={{ background: '#1c1c1c', color: 'var(--gold)', border: '1px solid #444', padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                      title="Ver expediente detallado, agendar clase diagnóstica e imprimir ficha oficial"
+                                    >
+                                      <Eye size={13} />
+                                      <span>Expediente</span>
+                                    </button>
+
                                     {/* Botón WhatsApp */}
                                     <button
                                       type="button"
@@ -4019,6 +4033,17 @@ export const AdminDashboardView: React.FC = () => {
           athletes={athletesForPairing}
           onClose={() => setShowPairingModal(false)}
           onSaveMatches={handleBatchSaveMatches}
+        />
+      )}
+
+      {/* Modal Expediente de Solicitud de Admisión */}
+      {selectedApplicationForDetail && (
+        <ApplicationDetailModal
+          isOpen={true}
+          onClose={() => setSelectedApplicationForDetail(null)}
+          application={selectedApplicationForDetail}
+          onApprove={handleApproveApplication}
+          onUpdateStatus={handleUpdateApplicationStatus}
         />
       )}
 
