@@ -8,9 +8,10 @@ import { resendService } from '../../services/resendService';
 import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
-  Swords, Eye, ChevronDown, ChevronUp
+  Swords, Eye, ChevronDown, ChevronUp, Award
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
+import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, logout, updateProfile, isConfigured } = useAuth();
@@ -47,6 +48,7 @@ export const MembersDashboardView: React.FC = () => {
 
   // Reportar pago
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: 120000,
     payment_method: 'Bancolombia' as const,
@@ -790,20 +792,31 @@ export const MembersDashboardView: React.FC = () => {
         {activeTab === 'perfil' && (
           <div style={{ maxWidth: '700px' }}>
             <div style={{ background: '#151515', border: '1px solid #282828', borderRadius: '16px', padding: '2.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--gold)', margin: 0 }}>
                   Ficha Deportiva del Afiliado
                 </h2>
-                {!editingProfile && (
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                   <button
-                    onClick={() => setEditingProfile(true)}
-                    className="btn btn--ghost btn--sm"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    type="button"
+                    onClick={() => setShowCertificateModal(true)}
+                    className="btn btn--primary btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
                   >
-                    <Edit2 size={14} />
-                    <span>Editar mis datos</span>
+                    <Award size={15} />
+                    <span>Certificado de Afiliación</span>
                   </button>
-                )}
+                  {!editingProfile && (
+                    <button
+                      onClick={() => setEditingProfile(true)}
+                      className="btn btn--ghost btn--sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <Edit2 size={14} />
+                      <span>Editar mis datos</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {editingProfile ? (
@@ -934,6 +947,15 @@ export const MembersDashboardView: React.FC = () => {
           blackPlayer={pgnModalData.blackPlayer}
           result={pgnModalData.result}
           pgn={pgnModalData.pgn}
+        />
+      )}
+
+      {/* Modal Certificado Oficial de Afiliación */}
+      {showCertificateModal && user && (
+        <AffiliationCertificateModal
+          isOpen={showCertificateModal}
+          onClose={() => setShowCertificateModal(false)}
+          member={user}
         />
       )}
     </div>

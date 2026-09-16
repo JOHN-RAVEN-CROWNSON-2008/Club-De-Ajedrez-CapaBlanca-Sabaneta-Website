@@ -19,6 +19,7 @@ import {
   Swords, Eye, Camera, Award, Edit, CheckSquare
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
+import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, logout } = useAuth();
@@ -112,6 +113,7 @@ export const AdminDashboardView: React.FC = () => {
   });
 
   const [editingMember, setEditingMember] = useState<UserProfile | null>(null);
+  const [certificateMember, setCertificateMember] = useState<UserProfile | null>(null);
 
   // Validar permisos
   useEffect(() => {
@@ -671,6 +673,95 @@ export const AdminDashboardView: React.FC = () => {
                   <button onClick={handleExportMembersCSV} className="btn btn--ghost btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Download size={16} /> Exportar Afiliados (CSV)
                   </button>
+                </div>
+              </div>
+
+              {/* Top 5 del Escalafón Deportivo del Club */}
+              <div style={{ marginTop: '2rem', background: '#121212', border: '1px solid #222', borderRadius: '14px', padding: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Award size={20} /> Top 5 del Escalafón Deportivo
+                    </h3>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Líderes de ranking Elo del Club Capablanca Sabaneta
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection('members')}
+                    className="btn btn--ghost btn--sm"
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    Ver Todos los Afiliados →
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  {[...members]
+                    .sort((a, b) => (b.elo_rating || 0) - (a.elo_rating || 0))
+                    .slice(0, 5)
+                    .map((m, idx) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          background: '#181818',
+                          border: `1px solid ${idx === 0 ? 'var(--gold)' : '#282828'}`,
+                          borderRadius: '10px',
+                          padding: '1.2rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '0.8rem',
+                          position: 'relative',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: idx === 0 ? '#ffd700' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#2a2a2a',
+                            color: idx < 3 ? '#000' : '#aaa',
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            #{idx + 1}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', background: '#252525', color: 'var(--gold)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
+                            {m.categoria_ajedrez || 'General'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <strong style={{ fontSize: '0.98rem', color: '#fff', display: 'block' }}>
+                            {m.nombre} {m.apellido}
+                          </strong>
+                          <span style={{ fontSize: '0.78rem', color: '#888' }}>
+                            @{m.usuario || 'afiliado'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #252525', paddingTop: '0.6rem' }}>
+                          <div style={{ fontSize: '0.85rem' }}>
+                            <span style={{ color: '#888', fontSize: '0.72rem', display: 'block' }}>Elo Club</span>
+                            <strong style={{ color: 'var(--gold)', fontSize: '1.1rem' }}>{m.elo_rating || '—'}</strong>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCertificateMember(m)}
+                            className="btn btn--ghost btn--sm"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', color: 'var(--gold)', borderColor: 'var(--gold)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                            title="Emitir certificado oficial"
+                          >
+                            <Award size={12} />
+                            <span>Certificado</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
@@ -1648,6 +1739,15 @@ export const AdminDashboardView: React.FC = () => {
                           <td style={{ padding: '1rem', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
                               <button
+                                onClick={() => setCertificateMember(m)}
+                                className="btn btn--ghost btn--sm"
+                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
+                                title="Generar Certificado Oficial de Afiliación"
+                              >
+                                <Award size={12} />
+                                <span>Certificado</span>
+                              </button>
+                              <button
                                 onClick={() => setEditingMember(m)}
                                 className="btn btn--ghost btn--sm"
                                 style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
@@ -1963,6 +2063,15 @@ export const AdminDashboardView: React.FC = () => {
           blackPlayer={activePgnMatch.black_player}
           result={activePgnMatch.result}
           pgn={activePgnMatch.pgn || ''}
+        />
+      )}
+
+      {/* Modal Certificado Oficial de Afiliación emitido por Admin */}
+      {certificateMember && (
+        <AffiliationCertificateModal
+          isOpen={true}
+          onClose={() => setCertificateMember(null)}
+          member={certificateMember}
         />
       )}
     </div>
