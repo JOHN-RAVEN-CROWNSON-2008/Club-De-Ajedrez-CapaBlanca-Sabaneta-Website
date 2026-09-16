@@ -16,7 +16,7 @@ import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
-  Swords, Eye, Camera, Award, Edit, CheckSquare
+  Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -116,6 +116,8 @@ export const AdminDashboardView: React.FC = () => {
   const [editingMember, setEditingMember] = useState<UserProfile | null>(null);
   const [certificateMember, setCertificateMember] = useState<UserProfile | null>(null);
   const [cardMember, setCardMember] = useState<UserProfile | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   // Validar permisos
   useEffect(() => {
@@ -525,6 +527,39 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Archivo CSV de afiliados descargado exitosamente');
   };
 
+  // Exportar Backup Integral de la Plataforma en JSON
+  const handleExportFullJsonBackup = () => {
+    const backupData = {
+      export_date: new Date().toISOString(),
+      club: 'Club Deportivo de Ajedrez Capablanca Sabaneta',
+      version: 'Enterprise 2.0',
+      database_type: isSupabaseConfigured() ? 'Supabase PostgreSQL' : 'Local Mock Data',
+      tables: {
+        site_settings: settings,
+        profiles: members,
+        events: events,
+        tournament_matches: matches,
+        tournament_registrations: registrations,
+        posts: posts,
+        documents: documents,
+        gallery: gallery,
+        membership_payments: payments,
+        class_schedules: schedules,
+        club_announcements: announcements,
+        contact_messages: messages,
+      },
+    };
+
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(backupData, null, 2))}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `Capablanca_Backup_Total_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    triggerNotice('Copia de seguridad completa (JSON) exportada exitosamente');
+  };
+
   if (!user) return null;
 
   return (
@@ -764,6 +799,80 @@ export const AdminDashboardView: React.FC = () => {
                         </div>
                       </div>
                     ))}
+                </div>
+              </div>
+
+              {/* Diagnóstico de Base de Datos & Copias de Seguridad */}
+              <div style={{ marginTop: '2rem', background: '#121212', border: '1px solid #222', borderRadius: '14px', padding: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Database size={20} /> Diagnóstico de Base de Datos & Copias de Seguridad
+                    </h3>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Auditoría de persistencia en Supabase, conteo de tablas y herramientas de exportación directa
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '50px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      background: isSupabaseConfigured() ? '#133519' : '#332910',
+                      color: isSupabaseConfigured() ? '#81c784' : '#ffd54f',
+                      border: `1px solid ${isSupabaseConfigured() ? '#2e7d32' : '#8d6e19'}`,
+                    }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isSupabaseConfigured() ? '#4caf50' : '#ffb300' }} />
+                      {isSupabaseConfigured() ? 'Supabase Conectado' : 'Modo Seguro Local'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Métricas de Tablas */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem', marginBottom: '1.5rem' }}>
+                  {[
+                    { name: 'Afiliados', count: members.length },
+                    { name: 'Torneos', count: events.length },
+                    { name: 'Partidas PGN', count: matches.length },
+                    { name: 'Inscripciones', count: registrations.length },
+                    { name: 'Documentos', count: documents.length },
+                    { name: 'Galería', count: gallery.length },
+                    { name: 'Cuotas/Pagos', count: payments.length },
+                    { name: 'Horarios', count: schedules.length },
+                    { name: 'Avisos', count: announcements.length },
+                    { name: 'Mensajes', count: messages.length },
+                  ].map((t) => (
+                    <div key={t.name} style={{ background: '#181818', border: '1px solid #282828', borderRadius: '8px', padding: '0.8rem 1rem' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#888', textTransform: 'uppercase' }}>{t.name}</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>{t.count}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Acciones de Respaldo */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', borderTop: '1px solid #222', paddingTop: '1.2rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleExportFullJsonBackup}
+                    className="btn btn--primary btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
+                  >
+                    <Download size={15} />
+                    <span>Descargar Backup Integral (JSON)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSqlModal(true)}
+                    className="btn btn--ghost btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Database size={15} />
+                    <span>Ver Esquema SQL Supabase</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -2093,6 +2202,146 @@ export const AdminDashboardView: React.FC = () => {
           onClose={() => setCardMember(null)}
           member={cardMember}
         />
+      )}
+
+      {/* Modal Esquema SQL Supabase */}
+      {showSqlModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              background: '#141414',
+              borderRadius: '16px',
+              border: '1px solid #333',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                background: '#101010',
+                borderBottom: '1px solid #222',
+                padding: '1.2rem 1.8rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Database size={22} color="var(--gold)" />
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff', fontWeight: 700 }}>
+                  Esquema SQL de Supabase (Enterprise V2)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.8rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ background: '#1c1c1c', border: '1px solid #333', borderRadius: '8px', padding: '1rem', fontSize: '0.85rem', color: '#ccc', lineHeight: 1.6 }}>
+                <strong style={{ color: 'var(--gold)', display: 'block', marginBottom: '0.3rem' }}>Guía de Configuración en Supabase:</strong>
+                1. Ingresa a tu dashboard de Supabase y navega a <strong>SQL Editor</strong>.<br />
+                2. Crea una nueva consulta (New Query), pega el contenido de <code>supabase_schema.sql</code> y pulsa <strong>RUN</strong>.<br />
+                3. Las 11 tablas, funciones de auto-creación de perfiles y políticas RLS quedarán configuradas de forma idempotente.
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <pre
+                  style={{
+                    margin: 0,
+                    padding: '1.2rem',
+                    background: '#0a0a0a',
+                    border: '1px solid #282828',
+                    borderRadius: '8px',
+                    color: '#81c784',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.5,
+                    maxHeight: '340px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+{`-- CLUB DEPORTIVO DE AJEDREZ CAPABLANCA SABANETA
+-- ESQUEMA COMPLETO DE BASE DE DATOS SUPABASE (11 TABLAS)
+-- 1. profiles (auth.users sync + FIDE ID + Elo Rating)
+-- 2. site_settings (configuraciones globales del club)
+-- 3. posts (noticias, blog y material formativo)
+-- 4. events (calendario oficial de torneos y válidas)
+-- 5. tournament_registrations (nómina con estados: confirmed, pending, attended, cancelled)
+-- 6. tournament_matches (emparejamientos, mesas, resultados 1-0, 0-1, 1/2-1/2 y PGN)
+-- 7. documents (repositorio de partidas PGN y reglamentos)
+-- 8. gallery (galería fotográfica con categorías y orden)
+-- 9. membership_payments (control de cuotas y transferencias)
+-- 10. class_schedules (cronograma semanal de entrenamientos)
+-- 11. club_announcements (alertas prioritarias en landing)
+-- 12. contact_messages (mensajes de contacto institucional)
+
+-- Archivo de referencia: supabase_schema.sql en la raíz del proyecto.`}
+                </pre>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: '#101010',
+                borderTop: '1px solid #222',
+                padding: '1rem 1.8rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', color: '#777' }}>
+                Archivo: <code>supabase_schema.sql</code> (439 líneas)
+              </span>
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('-- Ver archivo supabase_schema.sql en la raíz del proyecto para el código completo.');
+                    setSqlCopied(true);
+                    setTimeout(() => setSqlCopied(false), 3000);
+                  }}
+                  className="btn btn--primary btn--sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
+                >
+                  {sqlCopied ? <Check size={15} /> : <Copy size={15} />}
+                  <span>{sqlCopied ? 'Copiado al Portapapeles' : 'Copiar Referencia'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSqlModal(false)}
+                  className="btn btn--ghost btn--sm"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
