@@ -2,23 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_DOCUMENTS, INITIAL_EVENTS } from '../../lib/initialData';
-import { ClubDocument, ClubEvent, TournamentRegistration } from '../../types/database';
+import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES } from '../../lib/initialData';
+import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule } from '../../types/database';
 import { resendService } from '../../services/resendService';
 import {
-  User, Shield, FileText, Trophy, Download, LogOut, CheckCircle2,
-  Calendar, MapPin, Clock, Edit2, Save, X, ExternalLink, Sparkles
+  User, FileText, Trophy, Download, LogOut, CheckCircle2,
+  Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus
 } from 'lucide-react';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, logout, updateProfile, isConfigured } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'perfil' | 'documentos' | 'torneos'>('documentos');
+  const [activeTab, setActiveTab] = useState<'documentos' | 'torneos' | 'pagos' | 'horarios' | 'perfil'>('documentos');
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
+  const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
+  const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [myRegistrations, setMyRegistrations] = useState<string[]>([]);
   const [selectedDocCategory, setSelectedDocCategory] = useState<string>('all');
+  const [docSearch, setDocSearch] = useState<string>('');
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     nombre: '',
@@ -29,9 +32,19 @@ export const MembersDashboardView: React.FC = () => {
     elo_rating: 0,
     fide_id: '',
   });
+
+  // Reportar pago
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 120000,
+    payment_method: 'Bancolombia' as const,
+    reference_number: '',
+    period: 'Octubre 2026',
+    notes: '',
+  });
+
   const [notice, setNotice] = useState('');
 
-  // Redirigir si no está autenticado
   useEffect(() => {
     if (!user) {
       navigate('/login-afiliado');
@@ -48,12 +61,13 @@ export const MembersDashboardView: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Cargar documentos y torneos
   useEffect(() => {
     async function loadMemberData() {
       if (!isSupabaseConfigured()) {
         setDocuments(INITIAL_DOCUMENTS);
         setEvents(INITIAL_EVENTS);
+        setPayments(INITIAL_PAYMENTS);
+        setSchedules(INITIAL_SCHEDULES);
         return;
       }
 
@@ -64,7 +78,16 @@ export const MembersDashboardView: React.FC = () => {
         const { data: evData } = await supabase.from('events').select('*');
         if (evData && evData.length > 0) setEvents(evData as ClubEvent[]);
 
+        const { data: schData } = await supabase.from('class_schedules').select('*');
+        if (schData && schData.length > 0) setSchedules(schData as ClassSchedule[]);
+
         if (user) {
+          const { data: payData } = await supabase
+            .from('membership_payments')
+            .select('*')
+            .eq('user_id', user.id);
+          if (payData && payData.length > 0) setPayments(payData as MembershipPayment[]);
+
           const { data: regData } = await supabase
             .from('tournament_registrations')
             .select('event_id')
@@ -86,7 +109,7 @@ export const MembersDashboardView: React.FC = () => {
     const res = await updateProfile(profileForm);
     if (res.success) {
       setEditingProfile(false);
-      setNotice('Perfil actualizado exitosamente');
+      setNotice('Perfil deportivo actualizado exitosamente');
       setTimeout(() => setNotice(''), 3000);
     }
   };
@@ -114,7 +137,6 @@ export const MembersDashboardView: React.FC = () => {
 
     setMyRegistrations((prev) => [...prev, event.id]);
 
-    // Enviar confirmación por correo con Resend
     await resendService.sendTournamentConfirmation(
       user.correo,
       `${user.nombre} ${user.apellido}`,
@@ -126,11 +148,47 @@ export const MembersDashboardView: React.FC = () => {
     setTimeout(() => setNotice(''), 4000);
   };
 
+  const handleReportPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const newPay: MembershipPayment = {
+      id: 'pay-' + Date.now(),
+      user_id: user.id,
+      user_name: `${user.nombre} ${user.apellido}`,
+      user_email: user.correo,
+      amount: paymentForm.amount,
+      payment_date: new Date().toISOString().split('T')[0],
+      payment_method: paymentForm.payment_method,
+      reference_number: paymentForm.reference_number,
+      period: paymentForm.period,
+      status: 'pending',
+      notes: paymentForm.notes,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('membership_payments').insert(newPay);
+      } catch (err) {
+        console.error('Error al reportar pago en Supabase:', err);
+      }
+    }
+
+    setPayments([newPay, ...payments]);
+    setShowPaymentModal(false);
+    setPaymentForm({ amount: 120000, payment_method: 'Bancolombia', reference_number: '', period: 'Octubre 2026', notes: '' });
+    setNotice('Comprobante de pago reportado. La administración validará tu cuota en breve.');
+    setTimeout(() => setNotice(''), 4000);
+  };
+
   if (!user) return null;
 
   const filteredDocs = documents.filter((doc) => {
-    if (selectedDocCategory === 'all') return true;
-    return doc.category === selectedDocCategory;
+    const matchesCategory = selectedDocCategory === 'all' || doc.category === selectedDocCategory;
+    const matchesSearch = doc.title.toLowerCase().includes(docSearch.toLowerCase()) ||
+                          doc.description.toLowerCase().includes(docSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
   });
 
   return (
@@ -187,8 +245,8 @@ export const MembersDashboardView: React.FC = () => {
       {/* Contenedor Principal */}
       <div className="wrap" style={{ paddingBlock: '2.5rem' }}>
         
-        {/* Pestañas */}
-        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem', marginBottom: '2.5rem' }}>
+        {/* Pestañas de navegación */}
+        <div style={{ display: 'flex', gap: '0.8rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setActiveTab('documentos')}
@@ -196,7 +254,7 @@ export const MembersDashboardView: React.FC = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <FileText size={16} />
-            <span>Documentos & Recursos ({documents.length})</span>
+            <span>Documentos & PGN ({documents.length})</span>
           </button>
 
           <button
@@ -211,29 +269,49 @@ export const MembersDashboardView: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setActiveTab('pagos')}
+            className={`btn btn--sm ${activeTab === 'pagos' ? 'btn--primary' : 'btn--ghost'}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <CreditCard size={16} />
+            <span>Mis Cuotas & Pagos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('horarios')}
+            className={`btn btn--sm ${activeTab === 'horarios' ? 'btn--primary' : 'btn--ghost'}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Clock size={16} />
+            <span>Horarios de Clase</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('perfil')}
             className={`btn btn--sm ${activeTab === 'perfil' ? 'btn--primary' : 'btn--ghost'}`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <User size={16} />
-            <span>Ficha Deportiva & Perfil</span>
+            <span>Ficha Deportiva</span>
           </button>
         </div>
 
-        {/* PESTAÑA 1: DOCUMENTOS Y ARCHIVOS COMPARTIDOS */}
+        {/* PESTAÑA 1: DOCUMENTOS Y ARCHIVOS PGN */}
         {activeTab === 'documentos' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)' }}>
-                  Repositorio Oficial de Documentos y Partidas
+                  Repositorio de Documentos, Partidas PGN y Material
                 </h2>
                 <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '0.2rem' }}>
-                  Material descargable exclusivo para miembros del Club Capablanca
+                  Recursos pedagógicos y bases de datos exclusivos para socios
                 </p>
               </div>
 
-              {/* Categorías de documentos */}
+              {/* Categorías */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {['all', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares'].map((cat) => (
                   <button
@@ -254,6 +332,18 @@ export const MembersDashboardView: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Buscador de documentos */}
+            <div style={{ position: 'relative', marginBottom: '2rem' }}>
+              <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+              <input
+                type="text"
+                placeholder="Buscar por título, tema o autor (ej. Capablanca, táctica, aperturas)..."
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '8px', background: '#141414', border: '1px solid #333', color: '#fff' }}
+              />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
@@ -293,7 +383,7 @@ export const MembersDashboardView: React.FC = () => {
                       Descargas: {doc.downloads_count}
                     </span>
                     <button
-                      onClick={() => alert(`Descargando documento: ${doc.title}`)}
+                      onClick={() => alert(`Iniciando descarga: ${doc.title} (${doc.file_type.toUpperCase()})`)}
                       className="btn btn--primary btn--sm"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                     >
@@ -307,7 +397,7 @@ export const MembersDashboardView: React.FC = () => {
           </div>
         )}
 
-        {/* PESTAÑA 2: TORNEOS PARA AFILIADOS */}
+        {/* PESTAÑA 2: TORNEOS */}
         {activeTab === 'torneos' && (
           <div>
             <div style={{ marginBottom: '2rem' }}>
@@ -315,7 +405,7 @@ export const MembersDashboardView: React.FC = () => {
                 Inscripción Directa a Torneos
               </h2>
               <p style={{ color: '#888', fontSize: '0.9rem' }}>
-                Como afiliado activo, tus inscripciones se confirman automáticamente y gozan de tarifas preferenciales.
+                Preinscríbete a los torneos del club con un solo clic. Recibirás tu confirmación vía correo electrónico.
               </p>
             </div>
 
@@ -383,7 +473,175 @@ export const MembersDashboardView: React.FC = () => {
           </div>
         )}
 
-        {/* PESTAÑA 3: FICHA DEPORTIVA Y PERFIL */}
+        {/* PESTAÑA 3: MIS CUOTAS & PAGOS */}
+        {activeTab === 'pagos' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--gold)', margin: 0 }}>
+                  Estado de Afiliación & Mensualidades
+                </h2>
+                <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
+                  Consulta tu estado de pago y reporta transferencias de mensualidad
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="btn btn--primary btn--sm"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Plus size={16} /> Reportar Pago
+              </button>
+            </div>
+
+            {/* Modal de reporte de pago */}
+            {showPaymentModal && (
+              <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem', maxWidth: '600px' }}>
+                <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Reportar Comprobante de Pago</h3>
+                <form onSubmit={handleReportPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Periodo (Mes/Año)</label>
+                      <input
+                        type="text"
+                        required
+                        value={paymentForm.period}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, period: e.target.value })}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Valor Pagado ($ COP)</label>
+                      <input
+                        type="number"
+                        required
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Método de Pago</label>
+                      <select
+                        value={paymentForm.payment_method}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value as any })}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      >
+                        <option value="Bancolombia">Bancolombia</option>
+                        <option value="Nequi">Nequi</option>
+                        <option value="Daviplata">Daviplata</option>
+                        <option value="Efectivo">Efectivo en Sede</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Nro. Comprobante / Referencia</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. BC-881923"
+                        value={paymentForm.reference_number}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
+                  <textarea
+                    placeholder="Notas adicionales (ej. Pago dos meses adelantados, clase particular...)"
+                    rows={2}
+                    value={paymentForm.notes}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                  />
+
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button type="submit" className="btn btn--primary btn--sm">Enviar Reporte</button>
+                    <button type="button" onClick={() => setShowPaymentModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ background: '#1e1e1e', borderBottom: '1px solid #333', color: '#aaa', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                    <th style={{ padding: '1rem' }}>Periodo</th>
+                    <th style={{ padding: '1rem' }}>Valor</th>
+                    <th style={{ padding: '1rem' }}>Método</th>
+                    <th style={{ padding: '1rem' }}>Referencia</th>
+                    <th style={{ padding: '1rem' }}>Fecha</th>
+                    <th style={{ padding: '1rem', textAlign: 'right' }}>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid #222' }}>
+                      <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--gold)' }}>{p.period}</td>
+                      <td style={{ padding: '1rem', fontWeight: 700 }}>${p.amount.toLocaleString('es-CO')}</td>
+                      <td style={{ padding: '1rem' }}>{p.payment_method}</td>
+                      <td style={{ padding: '1rem', color: '#bbb' }}>{p.reference_number}</td>
+                      <td style={{ padding: '1rem', color: '#888' }}>{p.payment_date}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right' }}>
+                        <span style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: p.status === 'approved' ? '#1b5e20' : p.status === 'rejected' ? '#b71c1c' : '#f57f17',
+                          color: '#fff',
+                        }}>
+                          {p.status === 'approved' ? 'Al Día ✓' : p.status === 'rejected' ? 'Rechazado' : 'En Verificación'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* PESTAÑA 4: HORARIOS DE CLASE */}
+        {activeTab === 'horarios' && (
+          <div>
+            <div style={{ marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--gold)' }}>
+                Cronograma Semanal de Entrenamientos
+              </h2>
+              <p style={{ color: '#888', fontSize: '0.9rem' }}>
+                Consulta los días y horas de las clases según tu categoría asignada
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+              {schedules.map((sch) => (
+                <div key={sch.id} style={{ background: '#141414', border: '1px solid #282828', borderRadius: '14px', padding: '1.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
+                      {sch.modality}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#aaa' }}>{sch.trainer}</span>
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: '0.4rem 0' }}>{sch.category}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--gold)', fontWeight: 600, fontSize: '0.95rem', margin: '0.4rem 0' }}>
+                    <Clock size={16} />
+                    <span>{sch.day_of_week} · {sch.time_range}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#777', fontSize: '0.85rem', marginTop: '0.6rem' }}>
+                    <MapPin size={14} />
+                    <span>{sch.location}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PESTAÑA 5: PERFIL Y FICHA */}
         {activeTab === 'perfil' && (
           <div style={{ maxWidth: '700px' }}>
             <div style={{ background: '#151515', border: '1px solid #282828', borderRadius: '16px', padding: '2.5rem' }}>

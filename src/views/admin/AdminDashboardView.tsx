@@ -4,24 +4,34 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
-  MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE
+  MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_ANNOUNCEMENTS
 } from '../../lib/initialData';
-import { SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage } from '../../types/database';
+import {
+  SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
+  MembershipPayment, ClassSchedule, ClubAnnouncement
+} from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
-  Users, Mail, LogOut, Plus, Trash2, Edit, Save, CheckCircle2, AlertCircle
+  Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
+  CreditCard, Calendar, Megaphone, Download, Search, Check, X
 } from 'lucide-react';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [activeSection, setActiveSection] = useState<'overview' | 'content' | 'events' | 'blog' | 'documents' | 'members' | 'messages'>('overview');
+  const [activeSection, setActiveSection] = useState<
+    'overview' | 'content' | 'events' | 'blog' | 'documents' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages'
+  >('overview');
+
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [members, setMembers] = useState<UserProfile[]>([MOCK_ADMIN_PROFILE, MOCK_MEMBER_PROFILE]);
+  const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
+  const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
+  const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
   const [messages, setMessages] = useState<ContactMessage[]>([
     {
       id: 'msg-1',
@@ -34,41 +44,41 @@ export const AdminDashboardView: React.FC = () => {
       created_at: new Date().toISOString(),
     }
   ]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  // Formularios modales o de creación
+  // Modales
   const [showEventModal, setShowEventModal] = useState(false);
   const [newEvent, setNewEvent] = useState({
-    title: '',
-    description: '',
-    event_date: '',
-    event_time: '03:00 PM',
-    location: 'Sede CC Aves María, Sabaneta',
-    rhythm: 'Blitz 3+2',
-    category: 'Abierto',
+    title: '', description: '', event_date: '', event_time: '03:00 PM',
+    location: 'Sede CC Aves María, Sabaneta', rhythm: 'Blitz 3+2', category: 'Abierto',
     entry_fee: 'Gratis afiliados / $20.000 externos',
   });
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [newPost, setNewPost] = useState({
-    title: '',
-    excerpt: '',
-    content: '',
-    category: 'Formativo',
+    title: '', excerpt: '', content: '', category: 'Formativo',
     cover_image: 'assets/img/club-galeria-04.webp',
   });
 
   const [showDocModal, setShowDocModal] = useState(false);
   const [newDoc, setNewDoc] = useState({
-    title: '',
-    description: '',
-    category: 'Material de Estudio' as const,
-    file_type: 'pdf',
-    file_size: '2.1 MB',
-    file_url: '#',
+    title: '', description: '', category: 'Material de Estudio' as const,
+    file_type: 'pdf', file_size: '2.1 MB', file_url: '#',
   });
 
-  // Validar permisos de administrador
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [newSchedule, setNewSchedule] = useState({
+    category: '', trainer: 'Prof. Andrés Montoya', day_of_week: '', time_range: '',
+    modality: 'Presencial' as const, location: 'Sede CC Aves María, piso 3',
+  });
+
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '', message: '', level: 'info' as const, target: 'all' as const,
+  });
+
+  // Validar permisos
   useEffect(() => {
     if (!user) {
       navigate('/admin/login');
@@ -77,7 +87,7 @@ export const AdminDashboardView: React.FC = () => {
     }
   }, [user, role, navigate]);
 
-  // Cargar datos reales si Supabase está conectado
+  // Cargar datos de Supabase si está disponible
   useEffect(() => {
     async function fetchAdminData() {
       if (!isSupabaseConfigured()) return;
@@ -98,6 +108,15 @@ export const AdminDashboardView: React.FC = () => {
         const { data: profs } = await supabase.from('profiles').select('*');
         if (profs && profs.length > 0) setMembers(profs as UserProfile[]);
 
+        const { data: pays } = await supabase.from('membership_payments').select('*').order('created_at', { ascending: false });
+        if (pays && pays.length > 0) setPayments(pays as MembershipPayment[]);
+
+        const { data: schs } = await supabase.from('class_schedules').select('*');
+        if (schs && schs.length > 0) setSchedules(schs as ClassSchedule[]);
+
+        const { data: anns } = await supabase.from('club_announcements').select('*');
+        if (anns && anns.length > 0) setAnnouncements(anns as ClubAnnouncement[]);
+
         const { data: msgs } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
         if (msgs && msgs.length > 0) setMessages(msgs as ContactMessage[]);
       } catch (err) {
@@ -113,20 +132,16 @@ export const AdminDashboardView: React.FC = () => {
     setTimeout(() => setNotice(null), 3500);
   };
 
-  // Guardar configuración del CMS
+  // Guardar configuración
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('site_settings').upsert({ ...settings, id: 'general' });
-      } catch (err) {
-        console.error('Error al guardar configuración en Supabase:', err);
-      }
+      await supabase.from('site_settings').upsert({ ...settings, id: 'general' });
     }
     triggerNotice('Configuración del sitio web actualizada con éxito');
   };
 
-  // Crear Torneo
+  // Torneo
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     const eventItem: ClubEvent = {
@@ -145,42 +160,14 @@ export const AdminDashboardView: React.FC = () => {
       status: 'upcoming',
       created_at: new Date().toISOString(),
     };
-
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('events').insert({
-          title: eventItem.title,
-          slug: eventItem.slug,
-          description: eventItem.description,
-          event_date: eventItem.event_date,
-          event_time: eventItem.event_time,
-          location: eventItem.location,
-          rhythm: eventItem.rhythm,
-          category: eventItem.category,
-          entry_fee: eventItem.entry_fee,
-          is_open: true,
-        });
-      } catch (err) {
-        console.error('Error al insertar evento:', err);
-      }
+      await supabase.from('events').insert(eventItem);
     }
-
     setEvents([eventItem, ...events]);
     setShowEventModal(false);
-    setNewEvent({
-      title: '',
-      description: '',
-      event_date: '',
-      event_time: '03:00 PM',
-      location: 'Sede CC Aves María, Sabaneta',
-      rhythm: 'Blitz 3+2',
-      category: 'Abierto',
-      entry_fee: 'Gratis afiliados / $20.000 externos',
-    });
     triggerNotice('Torneo creado exitosamente');
   };
 
-  // Eliminar Torneo
   const handleDeleteEvent = async (id: string) => {
     if (isSupabaseConfigured()) {
       await supabase.from('events').delete().eq('id', id);
@@ -189,7 +176,7 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Torneo eliminado');
   };
 
-  // Crear Post de Blog
+  // Post
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     const postItem: Post = {
@@ -203,22 +190,14 @@ export const AdminDashboardView: React.FC = () => {
       published: true,
       created_at: new Date().toISOString(),
     };
-
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('posts').insert(postItem);
-      } catch (err) {
-        console.error('Error al insertar post:', err);
-      }
+      await supabase.from('posts').insert(postItem);
     }
-
     setPosts([postItem, ...posts]);
     setShowPostModal(false);
-    setNewPost({ title: '', excerpt: '', content: '', category: 'Formativo', cover_image: 'assets/img/club-galeria-04.webp' });
-    triggerNotice('Artículo publicado exitosamente');
+    triggerNotice('Artículo publicado');
   };
 
-  // Eliminar Post
   const handleDeletePost = async (id: string) => {
     if (isSupabaseConfigured()) {
       await supabase.from('posts').delete().eq('id', id);
@@ -227,7 +206,7 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Artículo eliminado');
   };
 
-  // Crear Documento
+  // Documento
   const handleCreateDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     const docItem: ClubDocument = {
@@ -242,22 +221,14 @@ export const AdminDashboardView: React.FC = () => {
       downloads_count: 0,
       created_at: new Date().toISOString(),
     };
-
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('documents').insert(docItem);
-      } catch (err) {
-        console.error('Error al insertar documento:', err);
-      }
+      await supabase.from('documents').insert(docItem);
     }
-
     setDocuments([docItem, ...documents]);
     setShowDocModal(false);
-    setNewDoc({ title: '', description: '', category: 'Material de Estudio', file_type: 'pdf', file_size: '2.1 MB', file_url: '#' });
-    triggerNotice('Documento añadido al repositorio de afiliados');
+    triggerNotice('Documento añadido');
   };
 
-  // Eliminar Documento
   const handleDeleteDoc = async (id: string) => {
     if (isSupabaseConfigured()) {
       await supabase.from('documents').delete().eq('id', id);
@@ -266,14 +237,91 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Documento eliminado');
   };
 
+  // Horario de clase
+  const handleCreateSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const schItem: ClassSchedule = {
+      id: 'sch-' + Date.now(),
+      category: newSchedule.category,
+      trainer: newSchedule.trainer,
+      day_of_week: newSchedule.day_of_week,
+      time_range: newSchedule.time_range,
+      modality: newSchedule.modality,
+      location: newSchedule.location,
+      active: true,
+    };
+    if (isSupabaseConfigured()) {
+      await supabase.from('class_schedules').insert(schItem);
+    }
+    setSchedules([...schedules, schItem]);
+    setShowScheduleModal(false);
+    triggerNotice('Horario de entrenamiento añadido');
+  };
+
+  // Anuncio Prioritario
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const annItem: ClubAnnouncement = {
+      id: 'ann-' + Date.now(),
+      title: newAnnouncement.title,
+      message: newAnnouncement.message,
+      level: newAnnouncement.level,
+      target: newAnnouncement.target,
+      active: true,
+      created_at: new Date().toISOString(),
+    };
+    if (isSupabaseConfigured()) {
+      await supabase.from('club_announcements').insert(annItem);
+    }
+    setAnnouncements([annItem, ...announcements]);
+    setShowAnnouncementModal(false);
+    triggerNotice('Anuncio de alerta activado');
+  };
+
+  // Aprobar / Rechazar Pago
+  const handleUpdatePaymentStatus = async (paymentId: string, newStatus: 'approved' | 'rejected') => {
+    if (isSupabaseConfigured()) {
+      await supabase.from('membership_payments').update({ status: newStatus }).eq('id', paymentId);
+    }
+    setPayments(payments.map((p) => (p.id === paymentId ? { ...p, status: newStatus } : p)));
+    triggerNotice(`Pago ${newStatus === 'approved' ? 'Aprobado ✓' : 'Rechazado'}`);
+  };
+
   // Cambiar rol de afiliado
   const handleToggleMemberRole = async (memberId: string, currentRole: string) => {
     const newRole = currentRole === 'admin' ? 'student' : 'admin';
     if (isSupabaseConfigured()) {
       await supabase.from('profiles').update({ role: newRole }).eq('id', memberId);
     }
-    setMembers(members.map((m) => m.id === memberId ? { ...m, role: newRole as any } : m));
+    setMembers(members.map((m) => (m.id === memberId ? { ...m, role: newRole as any } : m)));
     triggerNotice(`Rol actualizado a: ${newRole}`);
+  };
+
+  // Exportar Afiliados a CSV
+  const handleExportMembersCSV = () => {
+    const headers = ['ID', 'Nombre', 'Apellido', 'Usuario', 'Correo', 'Teléfono', 'Ciudad', 'Categoría', 'Elo', 'Rol', 'Estado'];
+    const rows = members.map((m) => [
+      m.id,
+      m.nombre,
+      m.apellido,
+      m.usuario,
+      m.correo,
+      m.telefono || '',
+      m.ciudad || '',
+      m.categoria_ajedrez || '',
+      m.elo_rating || 0,
+      m.role,
+      m.estado,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.map((f) => `"${f}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Afiliados_Capablanca_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerNotice('Archivo CSV de afiliados descargado exitosamente');
   };
 
   if (!user) return null;
@@ -292,14 +340,14 @@ export const AdminDashboardView: React.FC = () => {
               Capablanca CMS
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--gold)' }}>
-              Panel de Control Administrativo
+              Panel de Control Administrativo Avanzado
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" target="_blank" className="btn btn--ghost btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span>Ver Web en vivo</span>
+          <Link to="/" target="_blank" className="btn btn--ghost btn--sm">
+            Ver Web en vivo
           </Link>
           <button
             onClick={() => logout().then(() => navigate('/admin/login'))}
@@ -316,7 +364,7 @@ export const AdminDashboardView: React.FC = () => {
       <div style={{ display: 'flex', flex: 1 }}>
         
         {/* Sidebar */}
-        <aside style={{ width: '260px', background: '#0e0e0e', borderRight: '1px solid #222', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <aside style={{ width: '270px', background: '#0e0e0e', borderRight: '1px solid #222', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
           {[
             { id: 'overview', label: 'Resumen & Métricas', icon: <LayoutDashboard size={18} /> },
             { id: 'content', label: 'Editor del Sitio Web', icon: <Globe size={18} /> },
@@ -324,11 +372,14 @@ export const AdminDashboardView: React.FC = () => {
             { id: 'blog', label: 'Blog & Noticias', icon: <BookOpen size={18} /> },
             { id: 'documents', label: 'Documentos Afiliados', icon: <FileText size={18} /> },
             { id: 'members', label: 'Afiliados & Roles', icon: <Users size={18} /> },
+            { id: 'payments', label: 'Cuotas & Pagos', icon: <CreditCard size={18} /> },
+            { id: 'schedules', label: 'Horarios de Clase', icon: <Calendar size={18} /> },
+            { id: 'announcements', label: 'Avisos & Alertas', icon: <Megaphone size={18} /> },
             { id: 'messages', label: 'Bandeja de Contacto', icon: <Mail size={18} /> },
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id as any)}
+              onClick={() => { setActiveSection(item.id as any); setSearchTerm(''); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -346,7 +397,7 @@ export const AdminDashboardView: React.FC = () => {
               }}
             >
               {item.icon}
-              <span style={{ fontSize: '0.9rem' }}>{item.label}</span>
+              <span style={{ fontSize: '0.88rem' }}>{item.label}</span>
             </button>
           ))}
         </aside>
@@ -373,39 +424,38 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
-          {/* 1. SECCIÓN: OVERVIEW / RESUMEN */}
+          {/* 1. SECCIÓN: OVERVIEW */}
           {activeSection === 'overview' && (
             <div>
               <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
                 Panel de Control General
               </h1>
               <p style={{ color: '#888', marginBottom: '2rem' }}>
-                Resumen del estado operativo de la plataforma Capablanca Sabaneta
+                Resumen operativo y métricas en tiempo real del Club Deportivo de Ajedrez Capablanca Sabaneta
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
                 <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
-                  <div style={{ color: '#888', fontSize: '0.85rem', textTransform: 'uppercase' }}>Afiliados Registrados</div>
+                  <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Afiliados Totales</div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--gold)', marginTop: '0.3rem' }}>{members.length}</div>
                 </div>
                 <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
-                  <div style={{ color: '#888', fontSize: '0.85rem', textTransform: 'uppercase' }}>Torneos en Calendario</div>
+                  <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Torneos en Calendario</div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', marginTop: '0.3rem' }}>{events.length}</div>
                 </div>
                 <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
-                  <div style={{ color: '#888', fontSize: '0.85rem', textTransform: 'uppercase' }}>Artículos de Blog</div>
+                  <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Artículos de Blog</div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', marginTop: '0.3rem' }}>{posts.length}</div>
                 </div>
                 <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
-                  <div style={{ color: '#888', fontSize: '0.85rem', textTransform: 'uppercase' }}>Mensajes Recibidos</div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#81c784', marginTop: '0.3rem' }}>{messages.length}</div>
+                  <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Pagos Reportados</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#81c784', marginTop: '0.3rem' }}>{payments.length}</div>
                 </div>
               </div>
 
-              {/* Acceso Rápido */}
               <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '14px', padding: '2rem' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem', color: '#fff' }}>
-                  Acciones Rápidas del Administrador
+                  Accesos Rápidos de Gestión
                 </h3>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <button onClick={() => { setActiveSection('events'); setShowEventModal(true); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -417,19 +467,25 @@ export const AdminDashboardView: React.FC = () => {
                   <button onClick={() => { setActiveSection('documents'); setShowDocModal(true); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Plus size={16} /> Añadir Documento
                   </button>
+                  <button onClick={() => { setActiveSection('schedules'); setShowScheduleModal(true); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Plus size={16} /> Añadir Horario
+                  </button>
+                  <button onClick={handleExportMembersCSV} className="btn btn--ghost btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Download size={16} /> Exportar Afiliados (CSV)
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 2. SECCIÓN: EDITOR DE CONTENIDO WEB */}
+          {/* 2. SECCIÓN: CONFIGURACIÓN WEB */}
           {activeSection === 'content' && (
             <div style={{ maxWidth: '800px' }}>
               <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
                 Configuración del Sitio Web
               </h1>
               <p style={{ color: '#888', marginBottom: '2rem' }}>
-                Edita los datos de contacto, enlaces y mensajes predeterminados de la web pública
+                Edita los datos de contacto, teléfonos, WhatsApp y textos generales de la landing pública
               </p>
 
               <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -446,7 +502,7 @@ export const AdminDashboardView: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>WhatsApp (Dígitos internacionales)</label>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>WhatsApp Oficial</label>
                       <input
                         type="text"
                         value={settings.whatsapp}
@@ -493,7 +549,7 @@ export const AdminDashboardView: React.FC = () => {
 
                 <button type="submit" className="btn btn--primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
                   <Save size={18} />
-                  <span>Guardar Modificaciones</span>
+                  <span>Guardar Cambios</span>
                 </button>
               </form>
             </div>
@@ -512,7 +568,6 @@ export const AdminDashboardView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Modal de nuevo torneo */}
               {showEventModal && (
                 <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
                   <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Publicar Nuevo Torneo</h3>
@@ -608,7 +663,6 @@ export const AdminDashboardView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Modal nuevo post */}
               {showPostModal && (
                 <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
                   <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Nueva Publicación</h3>
@@ -681,13 +735,13 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
-          {/* 5. SECCIÓN: DOCUMENTOS DE AFILIADOS */}
+          {/* 5. SECCIÓN: DOCUMENTOS */}
           {activeSection === 'documents' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
                   <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Repositorio de Afiliados</h1>
-                  <p style={{ color: '#888' }}>Comparte archivos, PGNs y material de estudio exclusivo</p>
+                  <p style={{ color: '#888' }}>Comparte archivos, PGNs y material didáctico para los socios</p>
                 </div>
                 <button onClick={() => setShowDocModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Plus size={16} /> Añadir Documento
@@ -726,7 +780,7 @@ export const AdminDashboardView: React.FC = () => {
                       />
                       <input
                         type="text"
-                        placeholder="Peso aproximado (ej. 2.4 MB)"
+                        placeholder="Peso aproximado (ej. 2.1 MB)"
                         value={newDoc.file_size}
                         onChange={(e) => setNewDoc({ ...newDoc, file_size: e.target.value })}
                         style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
@@ -774,12 +828,32 @@ export const AdminDashboardView: React.FC = () => {
           {/* 6. SECCIÓN: AFILIADOS & ROLES */}
           {activeSection === 'members' && (
             <div>
-              <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
-                Control de Afiliados y Roles
-              </h1>
-              <p style={{ color: '#888', marginBottom: '2rem' }}>
-                Administra los permisos y categorías deportivas de los miembros del club
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    Control de Afiliados y Roles
+                  </h1>
+                  <p style={{ color: '#888', margin: 0 }}>
+                    Administra los permisos, categorías deportivas y Elo de los miembros
+                  </p>
+                </div>
+                <button onClick={handleExportMembersCSV} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Download size={16} />
+                  <span>Exportar Lista a CSV</span>
+                </button>
+              </div>
+
+              {/* Buscador */}
+              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, correo, usuario o categoría..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '8px', background: '#141414', border: '1px solid #333', color: '#fff' }}
+                />
+              </div>
 
               <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
@@ -794,35 +868,107 @@ export const AdminDashboardView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {members.map((m) => (
-                      <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
-                        <td style={{ padding: '1rem', fontWeight: 600 }}>
-                          {m.nombre} {m.apellido}
-                          <div style={{ fontSize: '0.75rem', color: '#888' }}>@{m.usuario}</div>
-                        </td>
-                        <td style={{ padding: '1rem', color: '#ccc' }}>{m.correo}</td>
-                        <td style={{ padding: '1rem', color: 'var(--gold)' }}>{m.categoria_ajedrez || 'Iniciación'}</td>
-                        <td style={{ padding: '1rem' }}>{m.elo_rating || '—'}</td>
+                    {members
+                      .filter((m) =>
+                        m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        m.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (m.categoria_ajedrez || '').toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((m) => (
+                        <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
+                          <td style={{ padding: '1rem', fontWeight: 600 }}>
+                            {m.nombre} {m.apellido}
+                            <div style={{ fontSize: '0.75rem', color: '#888' }}>@{m.usuario}</div>
+                          </td>
+                          <td style={{ padding: '1rem', color: '#ccc' }}>{m.correo}</td>
+                          <td style={{ padding: '1rem', color: 'var(--gold)' }}>{m.categoria_ajedrez || 'Iniciación'}</td>
+                          <td style={{ padding: '1rem' }}>{m.elo_rating || '—'}</td>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: m.role === 'admin' ? '#ffd54f' : '#2e2e2e',
+                              color: m.role === 'admin' ? '#000' : '#ccc',
+                            }}>
+                              {m.role}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right' }}>
+                            <button
+                              onClick={() => handleToggleMemberRole(m.id, m.role)}
+                              className="btn btn--ghost btn--sm"
+                              style={{ fontSize: '0.75rem' }}
+                            >
+                              Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 7. SECCIÓN: CUOTAS & PAGOS DE AFILIADOS */}
+          {activeSection === 'payments' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestor de Cuotas y Pagos</h1>
+                  <p style={{ color: '#888' }}>Control de mensualidades y comprobantes reportados por afiliados</p>
+                </div>
+              </div>
+
+              <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ background: '#1e1e1e', borderBottom: '1px solid #333', color: '#aaa', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                      <th style={{ padding: '1rem' }}>Afiliado</th>
+                      <th style={{ padding: '1rem' }}>Periodo</th>
+                      <th style={{ padding: '1rem' }}>Monto</th>
+                      <th style={{ padding: '1rem' }}>Método & Ref</th>
+                      <th style={{ padding: '1rem' }}>Fecha</th>
+                      <th style={{ padding: '1rem' }}>Estado</th>
+                      <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #222' }}>
+                        <td style={{ padding: '1rem', fontWeight: 600 }}>{p.user_name || p.user_id}</td>
+                        <td style={{ padding: '1rem', color: 'var(--gold)' }}>{p.period}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700 }}>${p.amount.toLocaleString('es-CO')}</td>
+                        <td style={{ padding: '1rem', color: '#bbb' }}>{p.payment_method} · {p.reference_number}</td>
+                        <td style={{ padding: '1rem', color: '#888' }}>{p.payment_date}</td>
                         <td style={{ padding: '1rem' }}>
                           <span style={{
-                            padding: '0.2rem 0.5rem',
+                            padding: '0.2rem 0.6rem',
                             borderRadius: '4px',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            background: m.role === 'admin' ? '#ffd54f' : '#2e2e2e',
-                            color: m.role === 'admin' ? '#000' : '#ccc',
+                            background: p.status === 'approved' ? '#1b5e20' : p.status === 'rejected' ? '#b71c1c' : '#f57f17',
+                            color: '#fff',
                           }}>
-                            {m.role}
+                            {p.status === 'approved' ? 'Aprobado' : p.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <button
-                            onClick={() => handleToggleMemberRole(m.id, m.role)}
-                            className="btn btn--ghost btn--sm"
-                            style={{ fontSize: '0.75rem' }}
-                          >
-                            Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
-                          </button>
+                          {p.status === 'pending' && (
+                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button onClick={() => handleUpdatePaymentStatus(p.id, 'approved')} className="btn btn--primary btn--sm" style={{ padding: '0.3rem 0.6rem' }}>
+                                <Check size={14} />
+                              </button>
+                              <button onClick={() => handleUpdatePaymentStatus(p.id, 'rejected')} className="btn btn--ghost btn--sm" style={{ padding: '0.3rem 0.6rem', borderColor: '#b71c1c', color: '#ff8a80' }}>
+                                <X size={14} />
+                              </button>
+                            </div>
+                          )}
+                          {p.status !== 'pending' && (
+                            <span style={{ fontSize: '0.8rem', color: '#666' }}>Procesado</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -832,7 +978,185 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
-          {/* 7. SECCIÓN: BANDEJA DE MENSAJES */}
+          {/* 8. SECCIÓN: HORARIOS DE CLASE */}
+          {activeSection === 'schedules' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Horarios Semanales de Clase</h1>
+                  <p style={{ color: '#888' }}>Configura el cronograma de entrenamientos por categoría</p>
+                </div>
+                <button onClick={() => setShowScheduleModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Plus size={16} /> Añadir Horario
+                </button>
+              </div>
+
+              {showScheduleModal && (
+                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                  <h3 style={{ color: 'var(--gold)', marginBottom: '1rem' }}>Nuevo Horario de Entrenamiento</h3>
+                  <form onSubmit={handleCreateSchedule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Categoría / Grupo (ej. Semillero Sub-12)"
+                        value={newSchedule.category}
+                        onChange={(e) => setNewSchedule({ ...newSchedule, category: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Entrenador a cargo"
+                        value={newSchedule.trainer}
+                        onChange={(e) => setNewSchedule({ ...newSchedule, trainer: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Días (ej. Martes y Jueves)"
+                        value={newSchedule.day_of_week}
+                        onChange={(e) => setNewSchedule({ ...newSchedule, day_of_week: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Horario (ej. 4:00 PM - 5:30 PM)"
+                        value={newSchedule.time_range}
+                        onChange={(e) => setNewSchedule({ ...newSchedule, time_range: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                      <select
+                        value={newSchedule.modality}
+                        onChange={(e) => setNewSchedule({ ...newSchedule, modality: e.target.value as any })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      >
+                        <option value="Presencial">Presencial</option>
+                        <option value="Online">Online</option>
+                        <option value="Híbrida">Híbrida</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button type="submit" className="btn btn--primary btn--sm">Guardar Horario</button>
+                      <button type="button" onClick={() => setShowScheduleModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                {schedules.map((sch) => (
+                  <div key={sch.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
+                        {sch.modality}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#888' }}>{sch.trainer}</span>
+                    </div>
+                    <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0.4rem 0' }}>{sch.category}</h3>
+                    <p style={{ color: 'var(--gold)', fontSize: '0.95rem', fontWeight: 600, margin: '0.2rem 0' }}>{sch.day_of_week} · {sch.time_range}</p>
+                    <p style={{ color: '#777', fontSize: '0.85rem', margin: 0 }}>{sch.location}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 9. SECCIÓN: AVISOS & ALERTAS */}
+          {activeSection === 'announcements' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Avisos & Alertas Prioritarias</h1>
+                  <p style={{ color: '#888' }}>Comunica alertas en vivo para la landing y el portal de afiliados</p>
+                </div>
+                <button onClick={() => setShowAnnouncementModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Plus size={16} /> Nuevo Aviso
+                </button>
+              </div>
+
+              {showAnnouncementModal && (
+                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                  <h3 style={{ color: 'var(--gold)', marginBottom: '1rem' }}>Nuevo Aviso Prioritario</h3>
+                  <form onSubmit={handleCreateAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Título del aviso"
+                      value={newAnnouncement.title}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <select
+                        value={newAnnouncement.level}
+                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, level: e.target.value as any })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      >
+                        <option value="info">Informativo (Azul/Oro)</option>
+                        <option value="warning">Advertencia (Naranja)</option>
+                        <option value="urgent">Urgente (Rojo)</option>
+                      </select>
+                      <select
+                        value={newAnnouncement.target}
+                        onChange={(e) => setNewAnnouncement({ ...newAnnouncement, target: e.target.value as any })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      >
+                        <option value="all">Todo público y afiliados</option>
+                        <option value="members">Solo afiliados</option>
+                        <option value="public">Solo visitantes públicos</option>
+                      </select>
+                    </div>
+                    <textarea
+                      required
+                      placeholder="Mensaje detallado..."
+                      rows={3}
+                      value={newAnnouncement.message}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })}
+                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                    />
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button type="submit" className="btn btn--primary btn--sm">Publicar Alerta</button>
+                      <button type="button" onClick={() => setShowAnnouncementModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {announcements.map((ann) => (
+                  <div
+                    key={ann.id}
+                    style={{
+                      background: '#141414',
+                      borderLeft: `4px solid ${ann.level === 'urgent' ? '#d32f2f' : ann.level === 'warning' ? '#f57c00' : 'var(--gold)'}`,
+                      borderTop: '1px solid #222',
+                      borderRight: '1px solid #222',
+                      borderBottom: '1px solid #222',
+                      borderRadius: '8px',
+                      padding: '1.5rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: 0 }}>{ann.title}</h3>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#888' }}>
+                        Destino: {ann.target}
+                      </span>
+                    </div>
+                    <p style={{ color: '#ccc', fontSize: '0.95rem', margin: '0.5rem 0 0', lineHeight: 1.5 }}>
+                      {ann.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 10. SECCIÓN: BANDEJA DE MENSAJES */}
           {activeSection === 'messages' && (
             <div>
               <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>

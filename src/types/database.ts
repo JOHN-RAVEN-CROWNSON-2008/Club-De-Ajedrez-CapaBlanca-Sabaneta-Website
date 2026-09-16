@@ -5,6 +5,8 @@ export type UserStatus = 'active' | 'inactive' | 'pending';
 export type EventStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 export type DocumentCategory = 'General' | 'Reglamento' | 'Material de Estudio' | 'Partidas PGN' | 'Circulares';
 export type RegistrationStatus = 'confirmed' | 'waitlist' | 'cancelled';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentMethod = 'Nequi' | 'Daviplata' | 'Bancolombia' | 'Efectivo' | 'Otro';
 
 export interface UserProfile {
   id: string;
@@ -120,4 +122,41 @@ export interface GalleryItem {
   category?: string;
   order_index?: number;
   created_at?: string;
+}
+
+export interface MembershipPayment {
+  id: string;
+  user_id: string;
+  user_name?: string;
+  user_email?: string;
+  amount: number;
+  payment_date: string;
+  payment_method: PaymentMethod;
+  reference_number: string;
+  period: string; // ej. "Octubre 2026"
+  status: PaymentStatus;
+  receipt_url?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface ClassSchedule {
+  id: string;
+  category: string; // ej. "Iniciación Infantil"
+  trainer: string; // ej. "Maestro Capablanca"
+  day_of_week: string; // ej. "Miércoles y Viernes"
+  time_range: string; // ej. "4:00 PM - 5:30 PM"
+  modality: 'Presencial' | 'Online' | 'Híbrida';
+  location: string;
+  active: boolean;
+}
+
+export interface ClubAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  level: 'info' | 'warning' | 'urgent';
+  active: boolean;
+  target: 'all' | 'public' | 'members';
+  created_at: string;
 }

@@ -1,4 +1,4 @@
-import { SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile } from '../types/database';
+import { SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile, MembershipPayment, ClassSchedule, ClubAnnouncement } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
   id: 'general',
@@ -185,6 +185,43 @@ export const INITIAL_GALLERY: GalleryItem[] = [
   { id: 'g-10', src: 'assets/img/seleccion-colombia.webp', alt: 'Selección Colombia de ajedrez ante las banderas de los países participantes', caption: 'Ajedrez colombiano', category: 'competencia', order_index: 10 },
   { id: 'g-11', src: 'assets/img/flyer-inscripciones.webp', alt: 'Pieza gráfica oficial del club anunciando inscripciones abiertas', caption: 'Inscripciones abiertas', category: 'anuncios', order_index: 11 },
   { id: 'g-12', src: 'assets/img/logo-capablanca.png', alt: 'Escudo circular del Club Escuela de Ajedrez Capablanca', caption: 'Nuestro escudo oficial', category: 'identidad', order_index: 12 }
+];
+
+export const INITIAL_SCHEDULES: ClassSchedule[] = [
+  { id: 'sch-1', category: 'Iniciación Infantil (4 a 8 años)', trainer: 'Prof. Andrés Montoya', day_of_week: 'Martes y Jueves', time_range: '4:00 PM - 5:30 PM', modality: 'Presencial', location: 'Sede CC Aves María, piso 3', active: true },
+  { id: 'sch-2', category: 'Semillero Sub-12', trainer: 'Prof. Andrés Montoya', day_of_week: 'Miércoles y Viernes', time_range: '4:00 PM - 6:00 PM', modality: 'Presencial', location: 'Sede CC Aves María, piso 3', active: true },
+  { id: 'sch-3', category: 'Desarrollo Juvenil Sub-16', trainer: 'Maestro Carlos Rúa', day_of_week: 'Lunes y Miércoles', time_range: '6:00 PM - 8:00 PM', modality: 'Híbrida', location: 'Sede CC Aves María / Zoom', active: true },
+  { id: 'sch-4', category: 'Adultos & Aficionados', trainer: 'Maestro Carlos Rúa', day_of_week: 'Sábados', time_range: '10:00 AM - 1:00 PM', modality: 'Presencial', location: 'Sede CC Aves María, piso 3', active: true },
+  { id: 'sch-5', category: 'Alta Competencia Departamental', trainer: 'Maestro Invitado FIDE', day_of_week: 'Sábados', time_range: '2:00 PM - 6:00 PM', modality: 'Presencial', location: 'Sede CC Aves María, piso 3', active: true },
+];
+
+export const INITIAL_PAYMENTS: MembershipPayment[] = [
+  {
+    id: 'pay-1',
+    user_id: 'usr-member-01',
+    user_name: 'Santiago Gómez',
+    user_email: 'afiliado@ajedrezcapablanca.com',
+    amount: 120000,
+    payment_date: '2026-09-02',
+    payment_method: 'Bancolombia',
+    reference_number: 'BC-992813',
+    period: 'Septiembre 2026',
+    status: 'approved',
+    notes: 'Mensualidad grupo Juvenil Sub-16',
+    created_at: '2026-09-02T10:30:00Z',
+  }
+];
+
+export const INITIAL_ANNOUNCEMENTS: ClubAnnouncement[] = [
+  {
+    id: 'ann-1',
+    title: '¡Inscripciones Abiertas Segundo Semestre 2026!',
+    message: 'Cupos disponibles para iniciación infantil y grupos de adultos. Agenda tu clase diagnóstica sin costo.',
+    level: 'info',
+    active: true,
+    target: 'all',
+    created_at: '2026-09-01T00:00:00Z',
+  }
 ];
 
 export const MOCK_ADMIN_PROFILE: UserProfile = {

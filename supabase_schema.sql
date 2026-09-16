@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- CLUB DEPORTIVO DE AJEDREZ CAPABLANCA SABANETA
--- ESQUEMA COMPLETO DE BASE DE DATOS PARA SUPABASE
+-- ESQUEMA COMPLETO DE BASE DE DATOS PARA SUPABASE (ENTERPRISE V2)
 -- ==============================================================================
 -- Este script es autocontenido e idempotente.
 -- Puedes copiar y pegar todo este archivo directamente en el SQL Editor de Supabase
@@ -46,13 +46,11 @@ DECLARE
     user_role TEXT;
     user_username TEXT;
 BEGIN
-    -- Extraer metadatos opcionales enviados en el registro
     user_nombre := COALESCE(new.raw_user_meta_data->>'nombre', new.raw_user_meta_data->>'full_name', '');
     user_apellido := COALESCE(new.raw_user_meta_data->>'apellido', '');
     user_role := COALESCE(new.raw_user_meta_data->>'role', 'student');
     user_username := COALESCE(new.raw_user_meta_data->>'usuario', split_part(new.email, '@', 1));
 
-    -- Asegurar unicidad simple de username si ya existe
     IF EXISTS (SELECT 1 FROM public.profiles WHERE usuario = user_username) THEN
         user_username := user_username || '_' || substr(new.id::text, 1, 4);
     END IF;
@@ -83,14 +81,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Recrear el trigger en auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ==============================================================================
--- 3. FUNCIÓN DE UTILIDAD DE SEGURIDAD: is_admin()
+-- 3. FUNCIÓN DE SEGURIDAD: is_admin()
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
@@ -194,7 +191,7 @@ CREATE TABLE IF NOT EXISTS public.tournament_registrations (
 );
 
 -- ==============================================================================
--- 9. TABLA: contact_messages (Mensajes recibidos desde el formulario de contacto)
+-- 9. TABLA: contact_messages (Mensajes del formulario de contacto)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.contact_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -221,7 +218,52 @@ CREATE TABLE IF NOT EXISTS public.gallery (
 );
 
 -- ==============================================================================
--- 11. HABILITACIÓN DE ROW LEVEL SECURITY (RLS) EN TODAS LAS TABLAS
+-- 11. TABLA: membership_payments (Gestión de Cuotas y Pagos de Afiliados)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.membership_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+    payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    payment_method TEXT NOT NULL DEFAULT 'Nequi' CHECK (payment_method IN ('Nequi', 'Daviplata', 'Bancolombia', 'Efectivo', 'Otro')),
+    reference_number TEXT NOT NULL DEFAULT '',
+    period TEXT NOT NULL, -- ej. 'Octubre 2026'
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    receipt_url TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 12. TABLA: class_schedules (Horarios Semanales de Clases de Ajedrez)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.class_schedules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category TEXT NOT NULL,
+    trainer TEXT NOT NULL DEFAULT 'Maestro Capablanca',
+    day_of_week TEXT NOT NULL,
+    time_range TEXT NOT NULL,
+    modality TEXT NOT NULL DEFAULT 'Presencial' CHECK (modality IN ('Presencial', 'Online', 'Híbrida')),
+    location TEXT NOT NULL DEFAULT 'Sede CC Aves María',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 13. TABLA: club_announcements (Avisos de Alerta Prioritaria)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.club_announcements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    level TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info', 'warning', 'urgent')),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    target TEXT NOT NULL DEFAULT 'all' CHECK (target IN ('all', 'public', 'members')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 14. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
@@ -231,120 +273,103 @@ ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournament_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.membership_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.club_announcements ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================================================
--- 12. POLÍTICAS DE ACCESO (RLS POLICIES)
+-- 15. POLÍTICAS RLS
 -- ==============================================================================
+-- Profiles
+DROP POLICY IF EXISTS "Perfiles lectura autenticados" ON public.profiles;
+CREATE POLICY "Perfiles lectura autenticados" ON public.profiles FOR SELECT USING (auth.uid() IS NOT NULL);
 
--- ---- PROFILES ----
-DROP POLICY IF EXISTS "Perfiles visibles para usuarios autenticados y admin" ON public.profiles;
-CREATE POLICY "Perfiles visibles para usuarios autenticados y admin"
-    ON public.profiles FOR SELECT
-    USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Usuarios editan propio perfil" ON public.profiles;
+CREATE POLICY "Usuarios editan propio perfil" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "Usuarios pueden actualizar su propio perfil" ON public.profiles;
-CREATE POLICY "Usuarios pueden actualizar su propio perfil"
-    ON public.profiles FOR UPDATE
-    USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "Admins gestionan perfiles" ON public.profiles;
+CREATE POLICY "Admins gestionan perfiles" ON public.profiles FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Admins pueden gestionar todos los perfiles" ON public.profiles;
-CREATE POLICY "Admins pueden gestionar todos los perfiles"
-    ON public.profiles FOR ALL
-    USING (public.is_admin());
+-- Site Settings
+DROP POLICY IF EXISTS "Settings lectura publica" ON public.site_settings;
+CREATE POLICY "Settings lectura publica" ON public.site_settings FOR SELECT USING (TRUE);
 
--- ---- SITE_SETTINGS ----
-DROP POLICY IF EXISTS "Configuración pública legible por cualquiera" ON public.site_settings;
-CREATE POLICY "Configuración pública legible por cualquiera"
-    ON public.site_settings FOR SELECT
-    USING (TRUE);
+DROP POLICY IF EXISTS "Admins gestionan settings" ON public.site_settings;
+CREATE POLICY "Admins gestionan settings" ON public.site_settings FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Solo admins pueden modificar configuración" ON public.site_settings;
-CREATE POLICY "Solo admins pueden modificar configuración"
-    ON public.site_settings FOR ALL
-    USING (public.is_admin());
+-- Posts
+DROP POLICY IF EXISTS "Posts lectura publica" ON public.posts;
+CREATE POLICY "Posts lectura publica" ON public.posts FOR SELECT USING (published = TRUE OR public.is_admin());
 
--- ---- POSTS ----
-DROP POLICY IF EXISTS "Posts publicados visibles por cualquiera" ON public.posts;
-CREATE POLICY "Posts publicados visibles por cualquiera"
-    ON public.posts FOR SELECT
-    USING (published = TRUE OR public.is_admin());
+DROP POLICY IF EXISTS "Admins gestionan posts" ON public.posts;
+CREATE POLICY "Admins gestionan posts" ON public.posts FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Solo admins pueden crear, editar y borrar posts" ON public.posts;
-CREATE POLICY "Solo admins pueden crear, editar y borrar posts"
-    ON public.posts FOR ALL
-    USING (public.is_admin());
+-- Events
+DROP POLICY IF EXISTS "Eventos lectura publica" ON public.events;
+CREATE POLICY "Eventos lectura publica" ON public.events FOR SELECT USING (TRUE);
 
--- ---- EVENTS ----
-DROP POLICY IF EXISTS "Eventos visibles por cualquiera" ON public.events;
-CREATE POLICY "Eventos visibles por cualquiera"
-    ON public.events FOR SELECT
-    USING (TRUE);
+DROP POLICY IF EXISTS "Admins gestionan eventos" ON public.events;
+CREATE POLICY "Admins gestionan eventos" ON public.events FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Solo admins pueden gestionar eventos" ON public.events;
-CREATE POLICY "Solo admins pueden gestionar eventos"
-    ON public.events FOR ALL
-    USING (public.is_admin());
+-- Documents
+DROP POLICY IF EXISTS "Afiliados leen documentos" ON public.documents;
+CREATE POLICY "Afiliados leen documentos" ON public.documents FOR SELECT USING (auth.uid() IS NOT NULL);
 
--- ---- DOCUMENTS ----
-DROP POLICY IF EXISTS "Afiliados autenticados pueden ver documentos" ON public.documents;
-CREATE POLICY "Afiliados autenticados pueden ver documentos"
-    ON public.documents FOR SELECT
-    USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Admins gestionan documentos" ON public.documents;
+CREATE POLICY "Admins gestionan documentos" ON public.documents FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Solo admins pueden gestionar documentos" ON public.documents;
-CREATE POLICY "Solo admins pueden gestionar documentos"
-    ON public.documents FOR ALL
-    USING (public.is_admin());
+-- Registrations
+DROP POLICY IF EXISTS "Inscripciones lectura" ON public.tournament_registrations;
+CREATE POLICY "Inscripciones lectura" ON public.tournament_registrations FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
--- ---- TOURNAMENT_REGISTRATIONS ----
-DROP POLICY IF EXISTS "Usuarios pueden ver sus propias inscripciones" ON public.tournament_registrations;
-CREATE POLICY "Usuarios pueden ver sus propias inscripciones"
-    ON public.tournament_registrations FOR SELECT
-    USING (auth.uid() = user_id OR public.is_admin());
+DROP POLICY IF EXISTS "Usuarios se inscriben" ON public.tournament_registrations;
+CREATE POLICY "Usuarios se inscriben" ON public.tournament_registrations FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Usuarios autenticados pueden inscribirse a torneos" ON public.tournament_registrations;
-CREATE POLICY "Usuarios autenticados pueden inscribirse a torneos"
-    ON public.tournament_registrations FOR INSERT
-    WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins gestionan inscripciones" ON public.tournament_registrations;
+CREATE POLICY "Admins gestionan inscripciones" ON public.tournament_registrations FOR ALL USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Usuarios pueden cancelar su propia inscripcion" ON public.tournament_registrations;
-CREATE POLICY "Usuarios pueden cancelar su propia inscripcion"
-    ON public.tournament_registrations FOR DELETE
-    USING (auth.uid() = user_id OR public.is_admin());
+-- Contact Messages
+DROP POLICY IF EXISTS "Cualquiera envia mensaje" ON public.contact_messages;
+CREATE POLICY "Cualquiera envia mensaje" ON public.contact_messages FOR INSERT WITH CHECK (TRUE);
 
-DROP POLICY IF EXISTS "Admins pueden gestionar todas las inscripciones" ON public.tournament_registrations;
-CREATE POLICY "Admins pueden gestionar todas las inscripciones"
-    ON public.tournament_registrations FOR ALL
-    USING (public.is_admin());
+DROP POLICY IF EXISTS "Admins ven mensajes" ON public.contact_messages;
+CREATE POLICY "Admins ven mensajes" ON public.contact_messages FOR ALL USING (public.is_admin());
 
--- ---- CONTACT_MESSAGES ----
-DROP POLICY IF EXISTS "Cualquiera puede enviar mensajes de contacto" ON public.contact_messages;
-CREATE POLICY "Cualquiera puede enviar mensajes de contacto"
-    ON public.contact_messages FOR INSERT
-    WITH CHECK (TRUE);
+-- Gallery
+DROP POLICY IF EXISTS "Galeria lectura publica" ON public.gallery;
+CREATE POLICY "Galeria lectura publica" ON public.gallery FOR SELECT USING (TRUE);
 
-DROP POLICY IF EXISTS "Solo admins pueden ver y gestionar mensajes" ON public.contact_messages;
-CREATE POLICY "Solo admins pueden ver y gestionar mensajes"
-    ON public.contact_messages FOR ALL
-    USING (public.is_admin());
+DROP POLICY IF EXISTS "Admins gestionan galeria" ON public.gallery;
+CREATE POLICY "Admins gestionan galeria" ON public.gallery FOR ALL USING (public.is_admin());
 
--- ---- GALLERY ----
-DROP POLICY IF EXISTS "Galería visible públicamente" ON public.gallery;
-CREATE POLICY "Galería visible públicamente"
-    ON public.gallery FOR SELECT
-    USING (TRUE);
+-- Membership Payments
+DROP POLICY IF EXISTS "Usuarios ven sus propios pagos" ON public.membership_payments;
+CREATE POLICY "Usuarios ven sus propios pagos" ON public.membership_payments FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
 
-DROP POLICY IF EXISTS "Solo admins pueden gestionar galería" ON public.gallery;
-CREATE POLICY "Solo admins pueden gestionar galería"
-    ON public.gallery FOR ALL
-    USING (public.is_admin());
+DROP POLICY IF EXISTS "Usuarios reportan su propio pago" ON public.membership_payments;
+CREATE POLICY "Usuarios reportan su propio pago" ON public.membership_payments FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins gestionan todos los pagos" ON public.membership_payments;
+CREATE POLICY "Admins gestionan todos los pagos" ON public.membership_payments FOR ALL USING (public.is_admin());
+
+-- Class Schedules
+DROP POLICY IF EXISTS "Horarios lectura publica" ON public.class_schedules;
+CREATE POLICY "Horarios lectura publica" ON public.class_schedules FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "Admins gestionan horarios" ON public.class_schedules;
+CREATE POLICY "Admins gestionan horarios" ON public.class_schedules FOR ALL USING (public.is_admin());
+
+-- Announcements
+DROP POLICY IF EXISTS "Anuncios lectura publica" ON public.club_announcements;
+CREATE POLICY "Anuncios lectura publica" ON public.club_announcements FOR SELECT USING (active = TRUE OR public.is_admin());
+
+DROP POLICY IF EXISTS "Admins gestionan anuncios" ON public.club_announcements;
+CREATE POLICY "Admins gestionan anuncios" ON public.club_announcements FOR ALL USING (public.is_admin());
 
 -- ==============================================================================
--- 13. DATOS INICIALES (SEED DATA)
+-- 16. SEED DATA (DATOS INICIALES COMPLETOS)
 -- ==============================================================================
 
--- Configuración general del club
 INSERT INTO public.site_settings (id, telefono, whatsapp, sede, ciudad, instagram)
 VALUES (
     'general',
@@ -357,117 +382,18 @@ VALUES (
     telefono = EXCLUDED.telefono,
     whatsapp = EXCLUDED.whatsapp;
 
--- Torneos iniciales
-INSERT INTO public.events (title, slug, description, event_date, event_time, location, rhythm, category, capacity, entry_fee, is_open)
-VALUES 
-(
-    'Torneo Relámpago Apertura Sabaneta',
-    'torneo-relampago-apertura-sabaneta',
-    'Torneo suizo a 7 rondas válido para ranking interno del club. Premiación con trofeos y medallas para los 3 primeros lugares y mejor sub-14.',
-    CURRENT_DATE + INTERVAL '12 days',
-    '03:00 PM',
-    'Sede CC Aves María, tercer piso',
-    'Blitz 3+2',
-    'Abierto',
-    32,
-    'Gratuito para afiliados / $20.000 externos',
-    TRUE
-),
-(
-    'Festival Infantil de Ajedrez Capablanca',
-    'festival-infantil-ajedrez-capablanca',
-    'Competencia diseñada para categorías Sub-8, Sub-10 y Sub-12. Acompañamiento pedagógico y análisis guiado al finalizar cada ronda.',
-    CURRENT_DATE + INTERVAL '25 days',
-    '09:30 AM',
-    'Sede CC Aves María, tercer piso',
-    'Rápido 15+5',
-    'Infantil (Sub-8 a Sub-12)',
-    24,
-    '$15.000 (incluye certificado y refrigerio)',
-    TRUE
-) ON CONFLICT DO NOTHING;
-
--- Artículos de Blog iniciales
-INSERT INTO public.posts (title, slug, excerpt, content, cover_image, category, published)
+-- Horarios Semanales de Clases
+INSERT INTO public.class_schedules (category, trainer, day_of_week, time_range, modality, location)
 VALUES
-(
-    'Cómo preparar tu primer torneo de ajedrez: Guía práctica',
-    'como-preparar-primer-torneo-ajedrez',
-    'Consejos esenciales sobre manejo del reloj, anotación de partidas y control emocional en competencia para jugadores de todas las edades.',
-    'Competir por primera vez en un torneo de ajedrez es un hito emocionante para cualquier ajedrecista. En el Club Capablanca preparamos a nuestros deportistas tanto en el dominio técnico como en la fortaleza mental y el disfrute del juego. En este artículo repasamos las reglas básicas del uso del reloj con incremento, la importancia del descanso previo y la mentalidad positiva ante la victoria y la derrota.',
-    'assets/img/club-galeria-04.webp',
-    'Formativo',
-    TRUE
-),
-(
-    'Capablanca Sabaneta brilla en el torneo interclubes',
-    'capablanca-sabaneta-brilla-interclubes',
-    'Nuestra delegación infantil y juvenil cosechó 5 podios en una jornada memorable de ajedrez federado en Antioquia.',
-    'Con una destacada participación de más de 20 deportistas, el Club de Ajedrez Capablanca Sabaneta demostró el fruto del entrenamiento constante. Felicitamos a todos los alumnos, familias y entrenadores por su entrega y espíritu deportivo en cada tablero.',
-    'assets/img/equipo-infantil-trofeos.webp',
-    'Torneos',
-    TRUE
-) ON CONFLICT DO NOTHING;
-
--- Documentos de estudio y reglamentos para Afiliados
-INSERT INTO public.documents (title, description, file_url, file_type, file_size, category, min_role)
-VALUES
-(
-    'Reglamento Interno y Código de Ética 2026',
-    'Normativa general para miembros, deberes en torneos y protocolo de convivencia del club.',
-    '#docs-reglamento-interno',
-    'pdf',
-    '1.8 MB',
-    'Reglamento',
-    'student'
-),
-(
-    'Guía de Aperturas Básicas: Principios Fundamentales',
-    'Material de estudio para alumnos de iniciación y nivel intermedio sobre control de centro y desarrollo armónico.',
-    '#docs-aperturas-basicas',
-    'pdf',
-    '3.4 MB',
-    'Material de Estudio',
-    'student'
-),
-(
-    'Base de Partidas Notables de José Raúl Capablanca (PGN)',
-    'Compilación de 50 partidas magistrales del tercer campeón del mundo comentadas paso a paso.',
-    '#docs-capablanca-pgn',
-    'pgn',
-    '450 KB',
-    'Partidas PGN',
-    'student'
-),
-(
-    'Circular Oficial: Convocatorias y Calendario Primer Semestre',
-    'Fechas oficiales de torneos departamentales, entrenamientos especiales y simulacros.',
-    '#docs-circular-calendario',
-    'pdf',
-    '890 KB',
-    'Circulares',
-    'student'
-) ON CONFLICT DO NOTHING;
-
--- Galería inicial
-INSERT INTO public.gallery (src, alt, caption, category, order_index)
-VALUES
-('assets/img/equipo-infantil-trofeos.webp', 'Categoría infantil del Club Capablanca con trofeos', 'Premiación categoría infantil', 'infantil', 1),
-('assets/img/delegacion-escalinatas.webp', 'Delegación completa del club antes del torneo', 'Delegación completa', 'delegacion', 2),
-('assets/img/campeon-sub8.webp', 'Alumnos y entrenadores con trofeo Campeón Sub-8', 'Campeón Sub-8', 'torneos', 3),
-('assets/img/equipo-adultos-torneo.webp', 'Equipo de adultos del club en competencia', 'Equipo de adultos', 'adultos', 4),
-('assets/img/delegacion-coliseo.webp', 'Deportistas del club en el coliseo', 'Noche de torneo', 'torneos', 5),
-('assets/img/ninos-celebrando.webp', 'Niños celebrando con las manos en alto', 'La familia Capablanca', 'comunidad', 6),
-('assets/img/premiacion-aves-maria.webp', 'Premiación en el Parque Comercial Aves María', 'Torneo en Aves María', 'torneos', 7),
-('assets/img/club-galeria-04.webp', 'Alumnos frente al mural de ajedrez de la sede', 'En nuestra sede', 'sede', 8),
-('assets/img/entrenadores-alumno.webp', 'Entrenadores acompañando al alumno premiado', 'Acompañamiento personalizado', 'entrenamiento', 9),
-('assets/img/seleccion-colombia.webp', 'Selección Colombia de ajedrez', 'Ajedrez colombiano', 'competencia', 10)
+('Iniciación Infantil (4 a 8 años)', 'Prof. Andrés Montoya', 'Martes y Jueves', '4:00 PM - 5:30 PM', 'Presencial', 'Sede CC Aves María, piso 3'),
+('Semillero Sub-12', 'Prof. Andrés Montoya', 'Miércoles y Viernes', '4:00 PM - 6:00 PM', 'Presencial', 'Sede CC Aves María, piso 3'),
+('Desarrollo Juvenil Sub-16', 'Maestro Carlos Rúa', 'Lunes y Miércoles', '6:00 PM - 8:00 PM', 'Híbrida', 'Sede CC Aves María / Zoom'),
+('Adultos & Aficionados', 'Maestro Carlos Rúa', 'Sábados', '10:00 AM - 1:00 PM', 'Presencial', 'Sede CC Aves María, piso 3'),
+('Alta Competencia Departamental', 'Maestro Internacional Invitado', 'Sábados', '2:00 PM - 6:00 PM', 'Presencial', 'Sede CC Aves María, piso 3')
 ON CONFLICT DO NOTHING;
 
--- ==============================================================================
--- INSTRUCCIONES PARA CREAR EL PRIMER USUARIO ADMINISTRADOR:
--- ==============================================================================
--- 1. Regístrate normalmente desde el formulario de registro de la web con tu correo.
--- 2. En el SQL Editor de Supabase ejecuta:
---    UPDATE public.profiles SET role = 'admin' WHERE correo = 'tu-correo@ejemplo.com';
--- ==============================================================================
+-- Anuncio Prioritario Inicial
+INSERT INTO public.club_announcements (title, message, level, active, target)
+VALUES
+('¡Inscripciones Abiertas Segundo Semestre 2026!', 'Cupos limitados para iniciación infantil y semilleros competitivos. Reserva tu clase diagnóstica sin costo.', 'info', TRUE, 'all')
+ON CONFLICT DO NOTHING;
