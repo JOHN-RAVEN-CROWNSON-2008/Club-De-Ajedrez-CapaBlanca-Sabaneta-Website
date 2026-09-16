@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
 import { ClubEvent, TournamentMatch } from '../../types/database';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal } from 'lucide-react';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal, UserCheck } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
+import { TournamentRegistrationModal } from '../../components/common/TournamentRegistrationModal';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
 export const TournamentsView: React.FC = () => {
@@ -17,6 +18,7 @@ export const TournamentsView: React.FC = () => {
   const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings'>>({});
   const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
+  const [registeringEvent, setRegisteringEvent] = useState<ClubEvent | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -469,19 +471,20 @@ export const TournamentsView: React.FC = () => {
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--gold)' }}>{evt.entry_fee}</div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <Link to="/afiliados" className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <ShieldCheck size={16} />
-                        <span>Inscribirme (Afiliado)</span>
-                      </Link>
-                      <a
-                        href={`https://wa.me/573002545835?text=${encodeURIComponent(`Hola, quiero inscribirme como externo al torneo: ${evt.title}`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn--ghost btn--sm"
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setRegisteringEvent(evt)}
+                        className="btn btn--primary btn--sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
                       >
-                        Inscripción Externa
-                      </a>
+                        <UserCheck size={16} />
+                        <span>Preinscribirme</span>
+                      </button>
+                      <Link to="/afiliados" className="btn btn--ghost btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <ShieldCheck size={16} />
+                        <span>Soy Afiliado</span>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -510,6 +513,15 @@ export const TournamentsView: React.FC = () => {
           isOpen={true}
           onClose={() => setTournamentCertModalData(null)}
           data={tournamentCertModalData}
+        />
+      )}
+
+      {/* Modal Preinscripción a Torneo */}
+      {registeringEvent && (
+        <TournamentRegistrationModal
+          isOpen={true}
+          onClose={() => setRegisteringEvent(null)}
+          event={registeringEvent}
         />
       )}
     </div>
