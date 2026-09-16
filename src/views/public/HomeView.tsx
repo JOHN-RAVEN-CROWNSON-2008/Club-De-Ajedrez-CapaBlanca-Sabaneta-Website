@@ -4,6 +4,7 @@ import { HeroSlider } from '../../components/public/HeroSlider';
 import { Ticker } from '../../components/public/Ticker';
 import { StatsSection } from '../../components/public/StatsSection';
 import { InstagramWall } from '../../components/public/InstagramWall';
+import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle';
 import { INITIAL_EVENTS, INITIAL_POSTS, INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
 import { ClubAnnouncement } from '../../types/database';
 import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle, Megaphone, X } from 'lucide-react';
@@ -128,6 +129,13 @@ export const HomeView: React.FC = () => {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Reto Táctico del Día: Joyas de Capablanca */}
+      <section className="section" style={{ background: '#0a0a0a', borderTop: '1px solid #1f1f1f', borderBottom: '1px solid #1f1f1f' }}>
+        <div className="wrap" style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <DailyTacticalPuzzle />
         </div>
       </section>
 

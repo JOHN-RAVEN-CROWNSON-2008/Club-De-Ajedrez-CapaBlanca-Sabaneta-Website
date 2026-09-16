@@ -13,6 +13,7 @@ import {
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
+import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, logout, updateProfile, isConfigured } = useAuth();
@@ -440,6 +441,11 @@ export const MembersDashboardView: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Reto Táctico Diario para Afiliados */}
+            <div style={{ marginTop: '3rem' }}>
+              <DailyTacticalPuzzle />
             </div>
           </div>
         )}
