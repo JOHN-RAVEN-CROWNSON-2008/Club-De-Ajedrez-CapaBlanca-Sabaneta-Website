@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
+import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, logout } = useAuth();
@@ -114,6 +115,7 @@ export const AdminDashboardView: React.FC = () => {
 
   const [editingMember, setEditingMember] = useState<UserProfile | null>(null);
   const [certificateMember, setCertificateMember] = useState<UserProfile | null>(null);
+  const [cardMember, setCardMember] = useState<UserProfile | null>(null);
 
   // Validar permisos
   useEffect(() => {
@@ -1748,6 +1750,15 @@ export const AdminDashboardView: React.FC = () => {
                                 <span>Certificado</span>
                               </button>
                               <button
+                                onClick={() => setCardMember(m)}
+                                className="btn btn--ghost btn--sm"
+                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                title="Generar Carnet Digital de Afiliado"
+                              >
+                                <CreditCard size={12} />
+                                <span>Carnet</span>
+                              </button>
+                              <button
                                 onClick={() => setEditingMember(m)}
                                 className="btn btn--ghost btn--sm"
                                 style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
@@ -2072,6 +2083,15 @@ export const AdminDashboardView: React.FC = () => {
           isOpen={true}
           onClose={() => setCertificateMember(null)}
           member={certificateMember}
+        />
+      )}
+
+      {/* Modal Carnet Digital de Afiliado emitido por Admin */}
+      {cardMember && (
+        <DigitalAthleteIdCardModal
+          isOpen={true}
+          onClose={() => setCardMember(null)}
+          member={cardMember}
         />
       )}
     </div>

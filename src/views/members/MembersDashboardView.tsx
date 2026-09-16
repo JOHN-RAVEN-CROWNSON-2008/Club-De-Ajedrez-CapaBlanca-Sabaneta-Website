@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
+import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 
 export const MembersDashboardView: React.FC = () => {
   const { user, logout, updateProfile, isConfigured } = useAuth();
@@ -49,6 +50,7 @@ export const MembersDashboardView: React.FC = () => {
   // Reportar pago
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: 120000,
     payment_method: 'Bancolombia' as const,
@@ -796,7 +798,7 @@ export const MembersDashboardView: React.FC = () => {
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--gold)', margin: 0 }}>
                   Ficha Deportiva del Afiliado
                 </h2>
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => setShowCertificateModal(true)}
@@ -804,7 +806,16 @@ export const MembersDashboardView: React.FC = () => {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
                   >
                     <Award size={15} />
-                    <span>Certificado de Afiliación</span>
+                    <span>Certificado</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCardModal(true)}
+                    className="btn btn--ghost btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: 'var(--gold)', borderColor: 'var(--gold)' }}
+                  >
+                    <CreditCard size={15} />
+                    <span>Carnet Digital</span>
                   </button>
                   {!editingProfile && (
                     <button
@@ -955,6 +966,15 @@ export const MembersDashboardView: React.FC = () => {
         <AffiliationCertificateModal
           isOpen={showCertificateModal}
           onClose={() => setShowCertificateModal(false)}
+          member={user}
+        />
+      )}
+
+      {/* Modal Carnet Digital de Afiliado */}
+      {showCardModal && user && (
+        <DigitalAthleteIdCardModal
+          isOpen={showCardModal}
+          onClose={() => setShowCardModal(false)}
           member={user}
         />
       )}
