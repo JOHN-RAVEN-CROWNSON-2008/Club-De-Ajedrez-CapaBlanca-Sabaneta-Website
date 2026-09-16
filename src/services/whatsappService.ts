@@ -33,6 +33,37 @@ export const whatsappService = {
   },
 
   /**
+   * Envía recordatorio personalizado de torneo a un atleta
+   */
+  openTournamentReminder(phone: string, athleteName: string, tournamentTitle: string, date: string, time: string) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const msg = `¡Hola ${athleteName}! ♟️ Te recordamos cordialmente desde el Club Deportivo de Ajedrez Capablanca Sabaneta que estás confirmado para el torneo "${tournamentTitle}" este ${date} a las ${time} en la sede CC Aves María (piso 3). Por favor preséntate 15 minutos antes para la conformación de mesas. ¡Muchos éxitos en tus partidas!`;
+    this.openChat(msg, fullPhone);
+  },
+
+  /**
+   * Envía recordatorio o notificación de pago de cuota
+   */
+  openPaymentReminder(phone: string, athleteName: string, period: string, amount: number) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const formattedAmount = `$${amount.toLocaleString('es-CO')}`;
+    const msg = `Hola ${athleteName}, te saludamos desde la administración del Club Capablanca Sabaneta ♞. Te informamos que tu cuota de afiliación del periodo ${period} (${formattedAmount}) se encuentra en proceso. Puedes reportar o consultar tus recibos directamente en el portal oficial: https://clubcapablanca.org/afiliados`;
+    this.openChat(msg, fullPhone);
+  },
+
+  /**
+   * Abre respuesta directa por WhatsApp a un mensaje de contacto ciudadano
+   */
+  openContactReply(phone: string, citizenName: string, subject: string) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const msg = `Hola ${citizenName}, recibimos tu solicitud enviada a través de la web del Club de Ajedrez Capablanca Sabaneta sobre "${subject}". Con gusto te brindamos toda la información que necesitas.`;
+    this.openChat(msg, fullPhone);
+  },
+
+  /**
    * Despacho a través de WhatsApp Cloud API (para automatizaciones del backend o webhook de servidor)
    */
   async sendCloudMessage(recipientPhone: string, messageText: string): Promise<{ success: boolean; data?: unknown; error?: string }> {

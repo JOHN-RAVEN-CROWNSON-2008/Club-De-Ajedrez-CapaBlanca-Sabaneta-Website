@@ -16,11 +16,12 @@ import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
-  Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server
+  Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
+import { whatsappService } from '../../services/whatsappService';
 
 export const AdminDashboardView: React.FC = () => {
   const { user, role, logout } = useAuth();
@@ -1414,6 +1415,20 @@ export const AdminDashboardView: React.FC = () => {
                                   >
                                     Presente
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const phone = prof?.telefono || '3002545835';
+                                      const name = prof ? `${prof.nombre} ${prof.apellido}` : 'Deportista';
+                                      whatsappService.openTournamentReminder(phone, name, ev?.title || 'Torneo Capablanca', ev?.event_date || 'Próxima fecha', ev?.event_time || '09:00 AM');
+                                    }}
+                                    className="btn btn--sm"
+                                    style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', padding: '0.2rem 0.45rem', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                    title="Enviar recordatorio y bases por WhatsApp"
+                                  >
+                                    <MessageCircle size={11} />
+                                    <span>WhatsApp</span>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1937,19 +1952,34 @@ export const AdminDashboardView: React.FC = () => {
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          {p.status === 'pending' && (
-                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                              <button onClick={() => handleUpdatePaymentStatus(p.id, 'approved')} className="btn btn--primary btn--sm" style={{ padding: '0.3rem 0.6rem' }}>
-                                <Check size={14} />
-                              </button>
-                              <button onClick={() => handleUpdatePaymentStatus(p.id, 'rejected')} className="btn btn--ghost btn--sm" style={{ padding: '0.3rem 0.6rem', borderColor: '#b71c1c', color: '#ff8a80' }}>
-                                <X size={14} />
-                              </button>
-                            </div>
-                          )}
-                          {p.status !== 'pending' && (
-                            <span style={{ fontSize: '0.8rem', color: '#666' }}>Procesado</span>
-                          )}
+                          <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const mem = members.find((m) => m.id === p.user_id || m.correo === p.user_email);
+                                const phone = mem?.telefono || '3002545835';
+                                whatsappService.openPaymentReminder(phone, p.user_name || 'Afiliado', p.period, p.amount);
+                              }}
+                              className="btn btn--sm"
+                              style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', padding: '0.3rem 0.5rem' }}
+                              title="Enviar notificación o consulta por WhatsApp"
+                            >
+                              <MessageCircle size={14} />
+                            </button>
+                            {p.status === 'pending' && (
+                              <>
+                                <button onClick={() => handleUpdatePaymentStatus(p.id, 'approved')} className="btn btn--primary btn--sm" style={{ padding: '0.3rem 0.6rem' }} title="Aprobar cuota">
+                                  <Check size={14} />
+                                </button>
+                                <button onClick={() => handleUpdatePaymentStatus(p.id, 'rejected')} className="btn btn--ghost btn--sm" style={{ padding: '0.3rem 0.6rem', borderColor: '#b71c1c', color: '#ff8a80' }} title="Rechazar cuota">
+                                  <X size={14} />
+                                </button>
+                              </>
+                            )}
+                            {p.status !== 'pending' && (
+                              <span style={{ fontSize: '0.8rem', color: '#666' }}>Procesado</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2157,9 +2187,23 @@ export const AdminDashboardView: React.FC = () => {
                           De: <strong>{msg.name}</strong> ({msg.email}) · Tel: {msg.phone || 'N/A'}
                         </p>
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                        {new Date(msg.created_at).toLocaleDateString('es-CO')}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {msg.phone && (
+                          <button
+                            type="button"
+                            onClick={() => whatsappService.openContactReply(msg.phone || '', msg.name, msg.subject || 'Consulta')}
+                            className="btn btn--sm"
+                            style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
+                            title="Responder directamente por WhatsApp"
+                          >
+                            <MessageCircle size={13} />
+                            <span>Responder WhatsApp</span>
+                          </button>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: '#666' }}>
+                          {new Date(msg.created_at).toLocaleDateString('es-CO')}
+                        </span>
+                      </div>
                     </div>
                     <p style={{ color: '#ddd', fontSize: '0.95rem', lineHeight: 1.6, background: '#1c1c1c', padding: '1rem', borderRadius: '8px' }}>
                       {msg.message}
