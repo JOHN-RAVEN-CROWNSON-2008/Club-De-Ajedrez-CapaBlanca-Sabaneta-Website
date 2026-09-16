@@ -3,13 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { FileUploadField } from '../../components/common/FileUploadField';
-import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE } from '../../lib/initialData';
-import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance } from '../../types/database';
+import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE, INITIAL_REGISTRATIONS } from '../../lib/initialData';
+import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance, TournamentRegistration } from '../../types/database';
 import { resendService } from '../../services/resendService';
 import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
-  Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck
+  Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -27,6 +27,7 @@ export const MembersDashboardView: React.FC = () => {
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
+  const [registrations, setRegistrations] = useState<TournamentRegistration[]>(INITIAL_REGISTRATIONS);
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [attendance, setAttendance] = useState<ClassAttendance[]>(INITIAL_ATTENDANCE);
@@ -34,7 +35,7 @@ export const MembersDashboardView: React.FC = () => {
   const [selectedDocCategory, setSelectedDocCategory] = useState<string>('all');
   const [docSearch, setDocSearch] = useState<string>('');
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
-  const [tournamentSubTabs, setTournamentSubTabs] = useState<Record<string, 'matches' | 'standings'>>({});
+  const [tournamentSubTabs, setTournamentSubTabs] = useState<Record<string, 'matches' | 'standings' | 'roster'>>({});
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
   const [pgnModalData, setPgnModalData] = useState<{
     isOpen: boolean;
@@ -121,10 +122,13 @@ export const MembersDashboardView: React.FC = () => {
 
           const { data: regData } = await supabase
             .from('tournament_registrations')
-            .select('event_id')
-            .eq('user_id', user.id);
-          if (regData) {
-            setMyRegistrations(regData.map((r) => r.event_id));
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (regData && regData.length > 0) {
+            setRegistrations(regData as TournamentRegistration[]);
+            setMyRegistrations(
+              regData.filter((r) => r.user_id === user.id).map((r) => r.event_id)
+            );
           }
         }
       } catch (err) {
@@ -166,7 +170,18 @@ export const MembersDashboardView: React.FC = () => {
       }
     }
 
+    const newReg: TournamentRegistration = {
+      id: crypto.randomUUID(),
+      event_id: event.id,
+      user_id: user.id,
+      status: 'confirmed',
+      created_at: new Date().toISOString(),
+      profile: user,
+    };
+    setRegistrations((prev) => [newReg, ...prev]);
     setMyRegistrations((prev) => [...prev, event.id]);
+    setTournamentSubTabs((prev) => ({ ...prev, [event.id]: 'roster' }));
+    setExpandedEventId(event.id);
 
     await resendService.sendTournamentConfirmation(
       user.correo,
@@ -535,11 +550,39 @@ export const MembersDashboardView: React.FC = () => {
                       {/* Emparejamientos & Clasificación */}
                       {(() => {
                         const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                        const eventRegs = registrations.filter((r) => r.event_id === evt.id && r.status !== 'cancelled');
                         const isExpanded = expandedEventId === evt.id;
-                        const subTab = tournamentSubTabs[evt.id] || 'matches';
+                        const subTab = tournamentSubTabs[evt.id] || (eventMatches.length > 0 ? 'matches' : 'roster');
                         const eventStandings = calculateTournamentStandings(eventMatches);
                         const athleteName = `${user?.nombre || ''} ${user?.apellido || ''}`.trim().toLowerCase();
                         const athleteLastName = (user?.apellido || '').trim().toLowerCase();
+
+                        const parsedAthletes = eventRegs.map((r) => {
+                          let ext: any = null;
+                          try {
+                            if (r.notes && r.notes.startsWith('{')) ext = JSON.parse(r.notes);
+                          } catch {}
+                          const isMe = r.user_id === user?.id;
+                          const name = ext?.fullName || (r.profile ? `${r.profile.nombre} ${r.profile.apellido}` : (isMe ? `${user?.nombre} ${user?.apellido}` : 'Deportista Capablanca'));
+                          const elo = Number(ext?.eloRating) || r.profile?.elo_rating || (isMe ? user?.elo_rating : 0) || 0;
+                          const fide = ext?.fideId || r.profile?.fide_id || (isMe ? user?.fide_id : '') || '';
+                          const category = ext?.category || r.profile?.categoria_ajedrez || (isMe ? user?.categoria_ajedrez : 'Categoría Abierta');
+                          const club = ext?.clubOrCity || 'Capablanca Sabaneta';
+                          const radicado = ext?.regCode || `REG-CAPA-${r.id.slice(0, 6).toUpperCase()}-2026`;
+                          const isConfirmed = r.status === 'confirmed' || r.status === 'attended';
+                          return {
+                            id: r.id,
+                            name,
+                            elo,
+                            fide,
+                            category,
+                            club,
+                            radicado,
+                            isConfirmed,
+                            isMe,
+                            status: r.status,
+                          };
+                        }).sort((a, b) => (b.elo || 0) - (a.elo || 0));
 
                         return (
                           <div style={{ marginTop: '1rem', borderTop: '1px solid #252525', paddingTop: '0.8rem' }}>
@@ -562,15 +605,35 @@ export const MembersDashboardView: React.FC = () => {
                             >
                               <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <Swords size={15} />
-                                Partidas ({eventMatches.length}) & Clasificación
+                                Nómina ({eventRegs.length}), Partidas ({eventMatches.length}) & Posiciones ({eventStandings.length})
                               </span>
                               {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                             </button>
 
                             {isExpanded && (
                               <div style={{ marginTop: '0.8rem' }}>
-                                {/* Pestañas internas: Partidas vs Tabla de Posiciones */}
-                                <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #252525', marginBottom: '0.8rem' }}>
+                                {/* Pestañas internas: Nómina vs Partidas vs Tabla de Posiciones */}
+                                <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #252525', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setTournamentSubTabs((prev) => ({ ...prev, [evt.id]: 'roster' }))}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      borderBottom: subTab === 'roster' ? '2px solid var(--gold)' : '2px solid transparent',
+                                      color: subTab === 'roster' ? 'var(--gold)' : '#777',
+                                      fontWeight: subTab === 'roster' ? 700 : 500,
+                                      fontSize: '0.78rem',
+                                      padding: '0.35rem 0.7rem',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem',
+                                    }}
+                                  >
+                                    <Users size={13} />
+                                    <span>Nómina ({eventRegs.length})</span>
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => setTournamentSubTabs((prev) => ({ ...prev, [evt.id]: 'matches' }))}
@@ -612,6 +675,78 @@ export const MembersDashboardView: React.FC = () => {
                                     <span>Tabla de Posiciones ({eventStandings.length})</span>
                                   </button>
                                 </div>
+
+                                {/* Contenido 0: Nómina de Deportistas */}
+                                {subTab === 'roster' && (
+                                  <div style={{ background: '#111', border: '1px solid #222', borderRadius: '8px', overflowX: 'auto' }}>
+                                    {parsedAthletes.length === 0 ? (
+                                      <p style={{ fontSize: '0.78rem', color: '#777', fontStyle: 'italic', margin: 0, padding: '1rem', textAlign: 'center' }}>
+                                        No hay participantes inscritos aún para este torneo.
+                                      </p>
+                                    ) : (
+                                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.76rem' }}>
+                                        <thead>
+                                          <tr style={{ background: '#181818', borderBottom: '1px solid #282828', color: '#888', textTransform: 'uppercase', fontSize: '0.66rem' }}>
+                                            <th style={{ padding: '0.45rem 0.7rem', width: '32px' }}>#</th>
+                                            <th style={{ padding: '0.45rem 0.7rem' }}>Deportista</th>
+                                            <th style={{ padding: '0.45rem 0.7rem' }}>Elo / FIDE</th>
+                                            <th style={{ padding: '0.45rem 0.7rem' }}>Procedencia</th>
+                                            <th style={{ padding: '0.45rem 0.7rem', textAlign: 'right' }}>Estado</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {parsedAthletes.map((ath, idx) => (
+                                            <tr
+                                              key={ath.id}
+                                              style={{
+                                                borderBottom: '1px solid #1c1c1c',
+                                                background: ath.isMe ? 'rgba(212, 175, 55, 0.08)' : 'transparent',
+                                              }}
+                                            >
+                                              <td style={{ padding: '0.45rem 0.7rem', color: '#777', fontWeight: 700 }}>
+                                                {idx + 1}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.7rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                  <span style={{ fontWeight: 600, color: ath.isMe ? 'var(--gold)' : '#fff' }}>
+                                                    {ath.name}
+                                                  </span>
+                                                  {ath.isMe && (
+                                                    <span style={{ fontSize: '0.62rem', background: 'var(--gold)', color: '#000', padding: '0.05rem 0.35rem', borderRadius: '3px', fontWeight: 800 }}>
+                                                      Tú
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div style={{ fontSize: '0.66rem', color: '#777' }}>{ath.radicado}</div>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.7rem' }}>
+                                                <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{ath.elo > 0 ? ath.elo : 'S/E'}</span>
+                                                {ath.fide && <span style={{ color: '#888', marginLeft: '0.25rem' }}>· {ath.fide}</span>}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.7rem', color: '#aaa' }}>
+                                                {ath.club}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.7rem', textAlign: 'right' }}>
+                                                <span style={{
+                                                  padding: '0.1rem 0.4rem',
+                                                  borderRadius: '4px',
+                                                  fontSize: '0.64rem',
+                                                  fontWeight: 700,
+                                                  textTransform: 'uppercase',
+                                                  background: ath.isConfirmed ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                                                  color: ath.isConfirmed ? '#4ade80' : '#fbbf24',
+                                                  border: `1px solid ${ath.isConfirmed ? '#15803d' : '#b45309'}`,
+                                                }}>
+                                                  {ath.status === 'attended' ? 'En Sala' : ath.status === 'confirmed' ? 'Confirmado' : 'Preinscrito'}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    )}
+                                  </div>
+                                )}
 
                                 {/* Contenido 1: Partidas */}
                                 {subTab === 'matches' && (
