@@ -173,3 +173,17 @@ export interface TournamentMatch {
   created_at?: string;
 }
 
+export type AttendanceStatus = 'present' | 'absent' | 'excused' | 'late';
+
+export interface ClassAttendance {
+  id: string;
+  schedule_id: string;
+  student_name: string;
+  user_id?: string;
+  session_date: string;
+  status: AttendanceStatus;
+  notes?: string;
+  created_at?: string;
+}
+
+

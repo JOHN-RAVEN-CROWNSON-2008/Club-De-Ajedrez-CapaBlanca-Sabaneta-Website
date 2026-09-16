@@ -5,18 +5,20 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
-  INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS
+  INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS,
+  INITIAL_ATTENDANCE
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
-  GalleryItem, TournamentRegistration
+  GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
-  Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle
+  Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
+  UserCheck, UserX, ClipboardList
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -41,6 +43,11 @@ export const AdminDashboardView: React.FC = () => {
   const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
+  const [attendance, setAttendance] = useState<ClassAttendance[]>(INITIAL_ATTENDANCE);
+  const [selectedAttendanceSchedule, setSelectedAttendanceSchedule] = useState<string>(INITIAL_SCHEDULES[1]?.id || 'sch-2');
+  const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [scheduleSubTab, setScheduleSubTab] = useState<'schedules' | 'attendance'>('schedules');
+  const [quickAttendeeName, setQuickAttendeeName] = useState<string>('');
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
   const [messages, setMessages] = useState<ContactMessage[]>([
     {
@@ -164,6 +171,9 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: schs } = await supabase.from('class_schedules').select('*');
         if (schs && schs.length > 0) setSchedules(schs as ClassSchedule[]);
+
+        const { data: atts } = await supabase.from('class_attendance').select('*').order('session_date', { ascending: false });
+        if (atts && atts.length > 0) setAttendance(atts as ClassAttendance[]);
 
         const { data: anns } = await supabase.from('club_announcements').select('*');
         if (anns && anns.length > 0) setAnnouncements(anns as ClubAnnouncement[]);
@@ -462,6 +472,172 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Horario de entrenamiento añadido');
   };
 
+  // Control de Asistencia & Reportes Inder
+  const handleUpdateAttendanceStatus = async (attId: string, newStatus: AttendanceStatus) => {
+    const updated = attendance.map((a) => (a.id === attId ? { ...a, status: newStatus } : a));
+    setAttendance(updated);
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_attendance').update({ status: newStatus }).eq('id', attId);
+      } catch (err) {
+        console.error('Error al actualizar estado en Supabase:', err);
+      }
+    }
+    const label = newStatus === 'present' ? 'Presente' : newStatus === 'excused' ? 'Excusa Médica/Escolar' : 'Ausente';
+    triggerNotice(`Asistencia actualizada: ${label}`);
+  };
+
+  const handleUpdateAttendanceNotes = async (attId: string, notes: string) => {
+    const updated = attendance.map((a) => (a.id === attId ? { ...a, notes } : a));
+    setAttendance(updated);
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_attendance').update({ notes }).eq('id', attId);
+      } catch (err) {
+        console.error('Error al actualizar nota en Supabase:', err);
+      }
+    }
+  };
+
+  const handleAddStudentToSession = async (studentName: string) => {
+    if (!studentName.trim()) return;
+    const newRecord: ClassAttendance = {
+      id: `att-${Date.now()}`,
+      schedule_id: selectedAttendanceSchedule,
+      student_name: studentName.trim(),
+      session_date: attendanceDate,
+      status: 'present',
+      notes: 'Ingreso a la sesión de entrenamiento',
+      created_at: new Date().toISOString(),
+    };
+
+    const updated = [...attendance, newRecord];
+    setAttendance(updated);
+    setQuickAttendeeName('');
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_attendance').insert({
+          schedule_id: newRecord.schedule_id,
+          student_name: newRecord.student_name,
+          session_date: newRecord.session_date,
+          status: newRecord.status,
+          notes: newRecord.notes,
+        });
+      } catch (err) {
+        console.error('Error al registrar deportista en sesión:', err);
+      }
+    }
+    triggerNotice(`Deportista ${studentName} registrado en la sesión`);
+  };
+
+  const handleInitializeSessionRoster = async () => {
+    const activeAthletes = members.filter((m) => m.role === 'student' || m.role === 'member');
+    const existingNames = new Set(
+      attendance
+        .filter((a) => a.session_date === attendanceDate && a.schedule_id === selectedAttendanceSchedule)
+        .map((a) => a.student_name.toLowerCase())
+    );
+
+    const newEntries: ClassAttendance[] = [];
+    activeAthletes.forEach((athlete) => {
+      const fullName = `${athlete.nombre} ${athlete.apellido}`.trim() || athlete.usuario;
+      if (!existingNames.has(fullName.toLowerCase())) {
+        newEntries.push({
+          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          schedule_id: selectedAttendanceSchedule,
+          student_name: fullName,
+          user_id: athlete.id,
+          session_date: attendanceDate,
+          status: 'present',
+          notes: 'Nómina oficial del club',
+          created_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    if (newEntries.length === 0) {
+      triggerNotice('Todos los alumnos registrados ya están en la planilla de esta fecha', 'error');
+      return;
+    }
+
+    const updated = [...attendance, ...newEntries];
+    setAttendance(updated);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_attendance').insert(
+          newEntries.map((e) => ({
+            schedule_id: e.schedule_id,
+            student_name: e.student_name,
+            user_id: e.user_id,
+            session_date: e.session_date,
+            status: e.status,
+            notes: e.notes,
+          }))
+        );
+      } catch (err) {
+        console.error('Error al inicializar nómina en Supabase:', err);
+      }
+    }
+    triggerNotice(`Se cargaron ${newEntries.length} deportistas en la planilla`);
+  };
+
+  const handleExportInderAttendanceCsv = (schedId: string, date: string) => {
+    const currentSched = schedules.find((s) => s.id === schedId) || schedules[0];
+    const sessionAtts = attendance.filter(
+      (a) => a.session_date === date && (!a.schedule_id || a.schedule_id === schedId)
+    );
+
+    if (sessionAtts.length === 0) {
+      triggerNotice('No hay registros de asistencia para exportar en esta fecha', 'error');
+      return;
+    }
+
+    let csv = '\uFEFF';
+    csv += 'CLUB DEPORTIVO DE AJEDREZ CAPABLANCA SABANETA\n';
+    csv += 'Personería Deportiva Res. 042 Inder Sabaneta - NIT 901.445.892-1\n';
+    csv += 'PLANILLA OFICIAL DE CONTROL DE ASISTENCIA A ENTRENAMIENTOS FORMATIVOS\n\n';
+    csv += `Grupo / Categoría,"${currentSched?.category || 'General'}"\n`;
+    csv += `Entrenador a Cargo,"${currentSched?.trainer || 'Maestro Capablanca'}"\n`;
+    csv += `Sede de Entrenamiento,"${currentSched?.location || 'CC Aves María, piso 3'}"\n`;
+    csv += `Fecha de Sesión,"${date}"\n`;
+    csv += `Horario,"${currentSched?.time_range || 'Oficial'}"\n\n`;
+    csv += 'N°,Deportista,Categoría,Estado de Asistencia,Observaciones Pedagógicas,Firma del Deportista / VoBo\n';
+
+    sessionAtts.forEach((att, idx) => {
+      const statusLabel =
+        att.status === 'present'
+          ? 'PRESENTE'
+          : att.status === 'excused'
+          ? 'EXCUSA MEDICA/ESCOLAR'
+          : att.status === 'late'
+          ? 'RETARDO'
+          : 'AUSENTE';
+      csv += `${idx + 1},"${att.student_name}","${currentSched?.category || 'Deportista'}","${statusLabel}","${(
+        att.notes || ''
+      ).replace(/"/g, '""')}","__________________________"\n`;
+    });
+
+    const totalPres = sessionAtts.filter((a) => a.status === 'present').length;
+    const totalExc = sessionAtts.filter((a) => a.status === 'excused').length;
+    const totalAus = sessionAtts.filter((a) => a.status === 'absent').length;
+
+    csv += `\nResumen de Sesión: Total Registrados: ${sessionAtts.length} | Presentes: ${totalPres} | Excusados: ${totalExc} | Ausentes: ${totalAus}\n`;
+    csv += `Firma Entrenador Responsable: _________________________________\n`;
+    csv += `Vo.Bo. Coordinación Técnica Inder Sabaneta: _________________________________\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const categorySlug = (currentSched?.category || 'Entrenamiento').replace(/[^a-zA-Z0-9]/g, '_');
+    link.setAttribute('download', `Planilla_Inder_Sabaneta_${categorySlug}_${date}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    triggerNotice('Planilla oficial Inder Sabaneta (CSV) exportada exitosamente');
+  };
+
   // Anuncio Prioritario
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -546,6 +722,7 @@ export const AdminDashboardView: React.FC = () => {
         gallery: gallery,
         membership_payments: payments,
         class_schedules: schedules,
+        class_attendance: attendance,
         club_announcements: announcements,
         contact_messages: messages,
       },
@@ -844,6 +1021,7 @@ export const AdminDashboardView: React.FC = () => {
                     { name: 'Galería', count: gallery.length },
                     { name: 'Cuotas/Pagos', count: payments.length },
                     { name: 'Horarios', count: schedules.length },
+                    { name: 'Asistencias Inder', count: attendance.length },
                     { name: 'Avisos', count: announcements.length },
                     { name: 'Mensajes', count: messages.length },
                   ].map((t) => (
@@ -1989,91 +2167,430 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
-          {/* 8. SECCIÓN: HORARIOS DE CLASE */}
+          {/* 8. SECCIÓN: HORARIOS DE CLASE & CONTROL DE ASISTENCIA INDER */}
           {activeSection === 'schedules' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              {/* Encabezado y sub-pestañas */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Horarios Semanales de Clase</h1>
-                  <p style={{ color: '#888' }}>Configura el cronograma de entrenamientos por categoría</p>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Horarios & Control de Asistencia</h1>
+                  <p style={{ color: '#888' }}>Supervisión técnica de entrenamientos y reporte oficial para Inder Sabaneta</p>
                 </div>
-                <button onClick={() => setShowScheduleModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Plus size={16} /> Añadir Horario
+                {scheduleSubTab === 'schedules' && (
+                  <button onClick={() => setShowScheduleModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Plus size={16} /> Añadir Horario
+                  </button>
+                )}
+              </div>
+
+              {/* Selector de sub-sección */}
+              <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '2rem', borderBottom: '1px solid #222', paddingBottom: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setScheduleSubTab('schedules')}
+                  className={`btn btn--sm ${scheduleSubTab === 'schedules' ? 'btn--primary' : 'btn--ghost'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Calendar size={16} />
+                  <span>Cronograma de Clases ({schedules.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleSubTab('attendance')}
+                  className={`btn btn--sm ${scheduleSubTab === 'attendance' ? 'btn--primary' : 'btn--ghost'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <ClipboardList size={16} />
+                  <span>Toma de Asistencia & Planilla Inder ({attendance.length})</span>
                 </button>
               </div>
 
-              {showScheduleModal && (
-                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
-                  <h3 style={{ color: 'var(--gold)', marginBottom: '1rem' }}>Nuevo Horario de Entrenamiento</h3>
-                  <form onSubmit={handleCreateSchedule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Categoría / Grupo (ej. Semillero Sub-12)"
-                        value={newSchedule.category}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, category: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="text"
-                        required
-                        placeholder="Entrenador a cargo"
-                        value={newSchedule.trainer}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, trainer: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
+              {scheduleSubTab === 'schedules' ? (
+                <>
+                  {showScheduleModal && (
+                    <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                      <h3 style={{ color: 'var(--gold)', marginBottom: '1rem' }}>Nuevo Horario de Entrenamiento</h3>
+                      <form onSubmit={handleCreateSchedule} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Categoría / Grupo (ej. Semillero Sub-12)"
+                            value={newSchedule.category}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, category: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <input
+                            type="text"
+                            required
+                            placeholder="Entrenador a cargo"
+                            value={newSchedule.trainer}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, trainer: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Días (ej. Martes y Jueves)"
+                            value={newSchedule.day_of_week}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, day_of_week: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <input
+                            type="text"
+                            required
+                            placeholder="Horario (ej. 4:00 PM - 5:30 PM)"
+                            value={newSchedule.time_range}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, time_range: e.target.value })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                          <select
+                            value={newSchedule.modality}
+                            onChange={(e) => setNewSchedule({ ...newSchedule, modality: e.target.value as any })}
+                            style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          >
+                            <option value="Presencial">Presencial</option>
+                            <option value="Online">Online</option>
+                            <option value="Híbrida">Híbrida</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                          <button type="submit" className="btn btn--primary btn--sm">Guardar Horario</button>
+                          <button type="button" onClick={() => setShowScheduleModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                        </div>
+                      </form>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Días (ej. Martes y Jueves)"
-                        value={newSchedule.day_of_week}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, day_of_week: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="text"
-                        required
-                        placeholder="Horario (ej. 4:00 PM - 5:30 PM)"
-                        value={newSchedule.time_range}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, time_range: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <select
-                        value={newSchedule.modality}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, modality: e.target.value as any })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      >
-                        <option value="Presencial">Presencial</option>
-                        <option value="Online">Online</option>
-                        <option value="Híbrida">Híbrida</option>
-                      </select>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                    {schedules.map((sch) => (
+                      <div key={sch.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
+                            {sch.modality}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: '#888' }}>{sch.trainer}</span>
+                        </div>
+                        <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0.4rem 0' }}>{sch.category}</h3>
+                        <p style={{ color: 'var(--gold)', fontSize: '0.95rem', fontWeight: 600, margin: '0.2rem 0' }}>{sch.day_of_week} · {sch.time_range}</p>
+                        <p style={{ color: '#777', fontSize: '0.85rem', margin: 0 }}>{sch.location}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Sub-pestaña: Toma de Asistencia & Reportes Inder */
+                <div>
+                  {/* Barra de Filtro y Acciones de la Sesión */}
+                  <div style={{ background: '#141414', border: '1px solid #282828', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.2rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                            Grupo / Entrenamiento:
+                          </label>
+                          <select
+                            value={selectedAttendanceSchedule}
+                            onChange={(e) => setSelectedAttendanceSchedule(e.target.value)}
+                            style={{ padding: '0.6rem 0.9rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.9rem' }}
+                          >
+                            {schedules.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.category} ({s.day_of_week})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#888', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                            Fecha de Sesión:
+                          </label>
+                          <input
+                            type="date"
+                            value={attendanceDate}
+                            onChange={(e) => setAttendanceDate(e.target.value)}
+                            style={{ padding: '0.6rem 0.9rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '0.9rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={handleInitializeSessionRoster}
+                          className="btn btn--ghost btn--sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid #444' }}
+                          title="Cargar los alumnos del club en la planilla de esta fecha"
+                        >
+                          <Users size={15} />
+                          <span>Cargar Alumnos</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportInderAttendanceCsv(selectedAttendanceSchedule, attendanceDate)}
+                          className="btn btn--sm"
+                          style={{
+                            background: 'linear-gradient(135deg, var(--gold), #e0a820)',
+                            color: '#000',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '0.6rem 1rem'
+                          }}
+                        >
+                          <Download size={15} />
+                          <span>Exportar Planilla Inder (CSV)</span>
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <button type="submit" className="btn btn--primary btn--sm">Guardar Horario</button>
-                      <button type="button" onClick={() => setShowScheduleModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
-                    </div>
-                  </form>
+
+                    {/* Resumen Institucional y Métricas */}
+                    {(() => {
+                      const curSch = schedules.find((s) => s.id === selectedAttendanceSchedule) || schedules[0];
+                      const sesAtts = attendance.filter(
+                        (a) => a.session_date === attendanceDate && (!a.schedule_id || a.schedule_id === selectedAttendanceSchedule)
+                      );
+                      const presCount = sesAtts.filter((a) => a.status === 'present').length;
+                      const excCount = sesAtts.filter((a) => a.status === 'excused').length;
+                      const absCount = sesAtts.filter((a) => a.status === 'absent').length;
+                      const attRate = sesAtts.length > 0 ? Math.round((presCount / sesAtts.length) * 100) : 0;
+
+                      return (
+                        <div style={{ marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid #222' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                            <div>
+                              <span style={{ fontSize: '0.75rem', background: '#1b3b22', color: '#81c784', padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: 700 }}>
+                                Inder Sabaneta · Res. 042
+                              </span>
+                              <span style={{ fontSize: '0.9rem', color: '#ccc', marginLeft: '0.6rem' }}>
+                                Instructor: <strong style={{ color: '#fff' }}>{curSch?.trainer}</strong> · {curSch?.location}
+                              </span>
+                            </div>
+
+                            {/* Tarjetas de Estadísticas de Sesión */}
+                            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                              <span style={{ background: '#1e1e1e', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid #333' }}>
+                                Total: <strong>{sesAtts.length}</strong>
+                              </span>
+                              <span style={{ background: '#132816', color: '#4caf50', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid #2e7d32', fontWeight: 700 }}>
+                                Presentes: {presCount}
+                              </span>
+                              <span style={{ background: '#12263a', color: '#42a5f5', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid #1976d2' }}>
+                                Excusas: {excCount}
+                              </span>
+                              <span style={{ background: '#381313', color: '#ef5350', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid #c62828' }}>
+                                Ausentes: {absCount}
+                              </span>
+                              <span style={{ background: '#252010', color: 'var(--gold)', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid #8d7318', fontWeight: 800 }}>
+                                Asistencia: {attRate}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Tabla de Asistencia */}
+                  {(() => {
+                    const curSch = schedules.find((s) => s.id === selectedAttendanceSchedule) || schedules[0];
+                    const sesAtts = attendance.filter(
+                      (a) => a.session_date === attendanceDate && (!a.schedule_id || a.schedule_id === selectedAttendanceSchedule)
+                    );
+
+                    if (sesAtts.length === 0) {
+                      return (
+                        <div style={{ background: '#141414', border: '1px dashed #333', borderRadius: '12px', padding: '3rem', textAlign: 'center' }}>
+                          <Users size={40} style={{ color: '#666', marginBottom: '1rem' }} />
+                          <h3 style={{ color: '#ccc', marginBottom: '0.5rem' }}>No hay lista de asistencia iniciada para esta sesión</h3>
+                          <p style={{ color: '#888', maxWidth: '460px', margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
+                            Puedes cargar automáticamente los deportistas inscritos en el club o agregar asistentes de manera individual.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleInitializeSessionRoster}
+                            className="btn btn--primary btn--sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                          >
+                            <Users size={16} /> Cargar Alumnos Registrados
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ background: '#141414', border: '1px solid #282828', borderRadius: '12px', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ background: '#1a1a1a', borderBottom: '1px solid #333', color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                              <th style={{ padding: '0.9rem 1.2rem' }}>Deportista</th>
+                              <th style={{ padding: '0.9rem 1.2rem' }}>Estado de Asistencia</th>
+                              <th style={{ padding: '0.9rem 1.2rem' }}>Observaciones Técnicas</th>
+                              <th style={{ padding: '0.9rem 1.2rem', textAlign: 'right' }}>Notificación</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sesAtts.map((att) => {
+                              const athlete = members.find((m) => m.id === att.user_id || `${m.nombre} ${m.apellido}`.trim() === att.student_name);
+                              const phone = athlete?.telefono || '3002545835';
+
+                              return (
+                                <tr key={att.id} style={{ borderBottom: '1px solid #202020' }}>
+                                  <td style={{ padding: '1rem 1.2rem' }}>
+                                    <div style={{ fontWeight: 600, color: '#fff' }}>{att.student_name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                                      {athlete?.categoria_ajedrez || curSch?.category || 'Alumno'} {athlete?.fide_id ? `· FIDE: ${athlete.fide_id}` : ''}
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: '1rem 1.2rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateAttendanceStatus(att.id, 'present')}
+                                        className="btn btn--sm"
+                                        style={{
+                                          padding: '0.35rem 0.7rem',
+                                          background: att.status === 'present' ? '#2e7d32' : '#1e1e1e',
+                                          color: att.status === 'present' ? '#fff' : '#888',
+                                          border: `1px solid ${att.status === 'present' ? '#4caf50' : '#333'}`,
+                                          fontSize: '0.8rem',
+                                          fontWeight: att.status === 'present' ? 700 : 400,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem'
+                                        }}
+                                        title="Marcar como Presente"
+                                      >
+                                        <Check size={13} /> Presente
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateAttendanceStatus(att.id, 'excused')}
+                                        className="btn btn--sm"
+                                        style={{
+                                          padding: '0.35rem 0.7rem',
+                                          background: att.status === 'excused' ? '#1565c0' : '#1e1e1e',
+                                          color: att.status === 'excused' ? '#fff' : '#888',
+                                          border: `1px solid ${att.status === 'excused' ? '#42a5f5' : '#333'}`,
+                                          fontSize: '0.8rem',
+                                          fontWeight: att.status === 'excused' ? 700 : 400,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem'
+                                        }}
+                                        title="Marcar con Excusa Médica o Escolar"
+                                      >
+                                        <AlertCircle size={13} /> Excusa
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateAttendanceStatus(att.id, 'absent')}
+                                        className="btn btn--sm"
+                                        style={{
+                                          padding: '0.35rem 0.7rem',
+                                          background: att.status === 'absent' ? '#c62828' : '#1e1e1e',
+                                          color: att.status === 'absent' ? '#fff' : '#888',
+                                          border: `1px solid ${att.status === 'absent' ? '#ef5350' : '#333'}`,
+                                          fontSize: '0.8rem',
+                                          fontWeight: att.status === 'absent' ? 700 : 400,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem'
+                                        }}
+                                        title="Marcar como Ausente"
+                                      >
+                                        <X size={13} /> Ausente
+                                      </button>
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: '1rem 1.2rem' }}>
+                                    <input
+                                      type="text"
+                                      defaultValue={att.notes || ''}
+                                      onBlur={(e) => handleUpdateAttendanceNotes(att.id, e.target.value)}
+                                      placeholder="Ej. Análisis de aperturas, puntual..."
+                                      style={{
+                                        width: '100%',
+                                        maxWidth: '300px',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: '6px',
+                                        background: '#1a1a1a',
+                                        border: '1px solid #333',
+                                        color: '#ddd',
+                                        fontSize: '0.82rem'
+                                      }}
+                                    />
+                                  </td>
+
+                                  <td style={{ padding: '1rem 1.2rem', textAlign: 'right' }}>
+                                    {att.status === 'absent' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => whatsappService.openAttendanceNotice(phone, att.student_name, curSch?.category || 'Clase', att.session_date)}
+                                        className="btn btn--sm"
+                                        style={{
+                                          background: '#25D366',
+                                          color: '#000',
+                                          fontWeight: 700,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem',
+                                          border: 'none',
+                                          fontSize: '0.75rem',
+                                          padding: '0.35rem 0.6rem'
+                                        }}
+                                        title="Enviar aviso por WhatsApp de inasistencia al deportista o acudiente"
+                                      >
+                                        <MessageCircle size={13} />
+                                        <span>Avisar Falla</span>
+                                      </button>
+                                    )}
+                                    {att.status !== 'absent' && (
+                                      <span style={{ fontSize: '0.8rem', color: '#666' }}>Al día</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+
+                        {/* Fila para agregar alumno rápido */}
+                        <div style={{ background: '#181818', borderTop: '1px solid #282828', padding: '1rem 1.2rem', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Nombre del deportista o invitado..."
+                            value={quickAttendeeName}
+                            onChange={(e) => setQuickAttendeeName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddStudentToSession(quickAttendeeName); }}
+                            style={{ padding: '0.5rem 0.8rem', borderRadius: '6px', background: '#121212', border: '1px solid #333', color: '#fff', fontSize: '0.85rem', flex: 1, maxWidth: '320px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddStudentToSession(quickAttendeeName)}
+                            className="btn btn--primary btn--sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          >
+                            <Plus size={14} />
+                            <span>Añadir a la Sesión</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                {schedules.map((sch) => (
-                  <div key={sch.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
-                        {sch.modality}
-                      </span>
-                      <span style={{ fontSize: '0.8rem', color: '#888' }}>{sch.trainer}</span>
-                    </div>
-                    <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0.4rem 0' }}>{sch.category}</h3>
-                    <p style={{ color: 'var(--gold)', fontSize: '0.95rem', fontWeight: 600, margin: '0.2rem 0' }}>{sch.day_of_week} · {sch.time_range}</p>
-                    <p style={{ color: '#777', fontSize: '0.85rem', margin: 0 }}>{sch.location}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
 

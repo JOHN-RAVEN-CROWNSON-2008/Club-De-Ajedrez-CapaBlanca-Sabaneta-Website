@@ -64,6 +64,16 @@ export const whatsappService = {
   },
 
   /**
+   * Envía notificación de inasistencia a clase al acudiente o alumno
+   */
+  openAttendanceNotice(phone: string, studentName: string, category: string, date: string) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const msg = `Hola ${studentName}, te saludamos desde la coordinación técnica del Club Capablanca Sabaneta ♞. Notamos tu inasistencia a la clase de "${category}" del día ${date}. Esperamos te encuentres muy bien. Si requieres justificar la sesión o reprogramar asesoría técnica, por favor respóndenos a este mensaje.`;
+    this.openChat(msg, fullPhone);
+  },
+
+  /**
    * Despacho a través de WhatsApp Cloud API (para automatizaciones del backend o webhook de servidor)
    */
   async sendCloudMessage(recipientPhone: string, messageText: string): Promise<{ success: boolean; data?: unknown; error?: string }> {

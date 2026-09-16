@@ -1,6 +1,7 @@
 import {
   SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
-  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration
+  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration,
+  ClassAttendance
 } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
@@ -412,5 +413,89 @@ export const INITIAL_MEMBERS: UserProfile[] = [
     created_at: '2025-04-10T00:00:00Z',
   }
 ];
+
+export const INITIAL_ATTENDANCE: ClassAttendance[] = [
+  {
+    id: 'att-1',
+    schedule_id: 'sch-2',
+    student_name: 'Santiago Gómez',
+    user_id: 'usr-member-01',
+    session_date: '2026-09-11',
+    status: 'present',
+    notes: 'Puntual, excelente trabajo en táctica de clavadas y finales',
+    created_at: '2026-09-11T16:05:00Z',
+  },
+  {
+    id: 'att-2',
+    schedule_id: 'sch-2',
+    student_name: 'Andrés Arboleda',
+    user_id: 'usr-member-02',
+    session_date: '2026-09-11',
+    status: 'present',
+    notes: 'Resolvió con éxito los 5 ejercicios de mate en 2',
+    created_at: '2026-09-11T16:05:00Z',
+  },
+  {
+    id: 'att-3',
+    schedule_id: 'sch-2',
+    student_name: 'Mateo Valencia',
+    user_id: 'usr-member-03',
+    session_date: '2026-09-11',
+    status: 'excused',
+    notes: 'Permiso médico presentado ante el cuerpo técnico',
+    created_at: '2026-09-11T16:05:00Z',
+  },
+  {
+    id: 'att-4',
+    schedule_id: 'sch-2',
+    student_name: 'Valentina Restrepo',
+    user_id: 'usr-member-04',
+    session_date: '2026-09-11',
+    status: 'present',
+    notes: 'Gran desempeño en partidas de práctica a 15 min',
+    created_at: '2026-09-11T16:05:00Z',
+  },
+  {
+    id: 'att-5',
+    schedule_id: 'sch-2',
+    student_name: 'Santiago Gómez',
+    user_id: 'usr-member-01',
+    session_date: '2026-09-09',
+    status: 'present',
+    notes: 'Estudio de técnica de Capablanca: finales de torres',
+    created_at: '2026-09-09T16:00:00Z',
+  },
+  {
+    id: 'att-6',
+    schedule_id: 'sch-2',
+    student_name: 'Valentina Restrepo',
+    user_id: 'usr-member-04',
+    session_date: '2026-09-09',
+    status: 'present',
+    notes: 'Participación destacada en tablero mural',
+    created_at: '2026-09-09T16:00:00Z',
+  },
+  {
+    id: 'att-7',
+    schedule_id: 'sch-2',
+    student_name: 'Andrés Arboleda',
+    user_id: 'usr-member-02',
+    session_date: '2026-09-09',
+    status: 'present',
+    notes: 'Análisis de partidas del torneo apertura',
+    created_at: '2026-09-09T16:00:00Z',
+  },
+  {
+    id: 'att-8',
+    schedule_id: 'sch-2',
+    student_name: 'Mateo Valencia',
+    user_id: 'usr-member-03',
+    session_date: '2026-09-09',
+    status: 'present',
+    notes: 'Puntual y concentrado',
+    created_at: '2026-09-09T16:00:00Z',
+  }
+];
+
 
 

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES } from '../../lib/initialData';
-import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch } from '../../types/database';
+import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE } from '../../lib/initialData';
+import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance } from '../../types/database';
 import { resendService } from '../../services/resendService';
 import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
-  Swords, Eye, ChevronDown, ChevronUp, Award
+  Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -25,6 +25,7 @@ export const MembersDashboardView: React.FC = () => {
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
+  const [attendance, setAttendance] = useState<ClassAttendance[]>(INITIAL_ATTENDANCE);
   const [myRegistrations, setMyRegistrations] = useState<string[]>([]);
   const [selectedDocCategory, setSelectedDocCategory] = useState<string>('all');
   const [docSearch, setDocSearch] = useState<string>('');
@@ -97,6 +98,9 @@ export const MembersDashboardView: React.FC = () => {
 
         const { data: schData } = await supabase.from('class_schedules').select('*');
         if (schData && schData.length > 0) setSchedules(schData as ClassSchedule[]);
+
+        const { data: attData } = await supabase.from('class_attendance').select('*').order('session_date', { ascending: false });
+        if (attData && attData.length > 0) setAttendance(attData as ClassAttendance[]);
 
         const { data: matchData } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
         if (matchData && matchData.length > 0) setMatches(matchData as TournamentMatch[]);
@@ -760,9 +764,112 @@ export const MembersDashboardView: React.FC = () => {
           </div>
         )}
 
-        {/* PESTAÑA 4: HORARIOS DE CLASE */}
+        {/* PESTAÑA 4: HORARIOS DE CLASE & ASISTENCIAS */}
         {activeTab === 'horarios' && (
           <div>
+            {/* Widget Personal de Asistencia del Afiliado */}
+            {(() => {
+              const myAttendance = attendance.filter(
+                (a) =>
+                  (user?.id && a.user_id === user.id) ||
+                  (user?.nombre && a.student_name.toLowerCase().includes(user.nombre.toLowerCase()))
+              );
+              const presCount = myAttendance.filter((a) => a.status === 'present').length;
+              const excCount = myAttendance.filter((a) => a.status === 'excused').length;
+              const absCount = myAttendance.filter((a) => a.status === 'absent').length;
+              const myRate = myAttendance.length > 0 ? Math.round((presCount / myAttendance.length) * 100) : 100;
+
+              return (
+                <div style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: '16px', padding: '1.8rem', marginBottom: '2.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.2rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <ClipboardCheck size={20} style={{ color: 'var(--gold)' }} />
+                        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff', margin: 0 }}>
+                          Mi Registro de Asistencia a Entrenamientos
+                        </h2>
+                      </div>
+                      <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.3rem 0 0 0' }}>
+                        Control oficial validado por la comisión técnica del Club y reportado a Inder Sabaneta
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <span style={{ background: '#1c281e', border: '1px solid #2e7d32', color: '#81c784', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700 }}>
+                        {presCount} Asistencias
+                      </span>
+                      {excCount > 0 && (
+                        <span style={{ background: '#12263a', border: '1px solid #1976d2', color: '#90caf9', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.82rem' }}>
+                          {excCount} Excusas
+                        </span>
+                      )}
+                      {absCount > 0 && (
+                        <span style={{ background: '#2d1515', border: '1px solid #c62828', color: '#ef9a9a', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.82rem' }}>
+                          {absCount} Inasistencias
+                        </span>
+                      )}
+                      <span style={{ background: 'linear-gradient(135deg, var(--gold), #e0a820)', color: '#000', padding: '0.4rem 0.9rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 800 }}>
+                        {myRate}% Cumplimiento
+                      </span>
+                    </div>
+                  </div>
+
+                  {myAttendance.length > 0 ? (
+                    <div style={{ background: '#101010', borderRadius: '10px', border: '1px solid #222', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ background: '#181818', color: '#888', borderBottom: '1px solid #2a2a2a' }}>
+                            <th style={{ padding: '0.7rem 1rem' }}>Fecha</th>
+                            <th style={{ padding: '0.7rem 1rem' }}>Estado</th>
+                            <th style={{ padding: '0.7rem 1rem' }}>Observación del Entrenador</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myAttendance.slice(0, 5).map((att) => (
+                            <tr key={att.id} style={{ borderBottom: '1px solid #1c1c1c' }}>
+                              <td style={{ padding: '0.7rem 1rem', color: '#ccc' }}>{att.session_date}</td>
+                              <td style={{ padding: '0.7rem 1rem' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background:
+                                      att.status === 'present'
+                                        ? '#1b3b22'
+                                        : att.status === 'excused'
+                                        ? '#12263a'
+                                        : '#381313',
+                                    color:
+                                      att.status === 'present'
+                                        ? '#81c784'
+                                        : att.status === 'excused'
+                                        ? '#90caf9'
+                                        : '#ef9a9a',
+                                  }}
+                                >
+                                  {att.status === 'present' ? 'Presente' : att.status === 'excused' ? 'Excusa Aprobada' : 'Inasistencia'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.7rem 1rem', color: '#aaa', fontStyle: att.notes ? 'normal' : 'italic' }}>
+                                {att.notes || 'Sin observaciones particulares'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '1rem', background: '#101010', borderRadius: '8px', color: '#888', fontSize: '0.85rem', textAlign: 'center' }}>
+                      Aún no tienes asistencias registradas en la plataforma este ciclo.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div style={{ marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--gold)' }}>
                 Cronograma Semanal de Entrenamientos
