@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { FileUploadField } from '../../components/common/FileUploadField';
 import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE } from '../../lib/initialData';
 import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance } from '../../types/database';
 import { resendService } from '../../services/resendService';
@@ -64,6 +65,7 @@ export const MembersDashboardView: React.FC = () => {
     reference_number: '',
     period: 'Octubre 2026',
     notes: '',
+    receipt_url: '',
   });
 
   const [notice, setNotice] = useState('');
@@ -182,7 +184,7 @@ export const MembersDashboardView: React.FC = () => {
     if (!user) return;
 
     const newPay: MembershipPayment = {
-      id: 'pay-' + Date.now(),
+      id: crypto.randomUUID(),
       user_id: user.id,
       user_name: `${user.nombre} ${user.apellido}`,
       user_email: user.correo,
@@ -193,6 +195,7 @@ export const MembersDashboardView: React.FC = () => {
       period: paymentForm.period,
       status: 'pending',
       notes: paymentForm.notes,
+      receipt_url: paymentForm.receipt_url || undefined,
       created_at: new Date().toISOString(),
     };
 
@@ -206,7 +209,7 @@ export const MembersDashboardView: React.FC = () => {
 
     setPayments([newPay, ...payments]);
     setShowPaymentModal(false);
-    setPaymentForm({ amount: 120000, payment_method: 'Bancolombia', reference_number: '', period: 'Octubre 2026', notes: '' });
+    setPaymentForm({ amount: 120000, payment_method: 'Bancolombia', reference_number: '', period: 'Octubre 2026', notes: '', receipt_url: '' });
     setNotice('Comprobante de pago reportado. La administración validará tu cuota en breve.');
     setTimeout(() => setNotice(''), 4000);
   };
@@ -863,6 +866,24 @@ export const MembersDashboardView: React.FC = () => {
               <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem', maxWidth: '600px' }}>
                 <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Reportar Comprobante de Pago</h3>
                 <form onSubmit={handleReportPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                      Foto o PDF del comprobante (Nequi, Daviplata, Bancolombia...)
+                    </label>
+                    <FileUploadField
+                      bucket="payment-receipts"
+                      mode="private"
+                      ownerId={user?.id || 'anon'}
+                      accept="image/*,.pdf"
+                      label="Adjuntar comprobante"
+                      onUploaded={(path) => setPaymentForm({ ...paymentForm, receipt_url: path })}
+                    />
+                    {paymentForm.receipt_url && (
+                      <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.8rem', color: '#81c784' }}>
+                        ✓ Comprobante adjuntado, se enviará junto con el reporte
+                      </span>
+                    )}
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Periodo (Mes/Año)</label>

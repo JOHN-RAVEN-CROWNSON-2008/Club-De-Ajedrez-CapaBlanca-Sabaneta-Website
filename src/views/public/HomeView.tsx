@@ -258,6 +258,24 @@ export const HomeView: React.FC = () => {
         </div>
       </section>
 
+      {/* 6.5. Reto Táctico del Día (Entrenamiento Interactivo) */}
+      <section className="section" style={{ background: '#080808', borderTop: '1px solid #222', borderBottom: '1px solid #222', padding: '3.5rem 1.5rem' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="pill pill--gold" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <BookOpen size={14} /> Escuela de Formación
+            </span>
+            <h2 className="display display--gold" style={{ marginTop: '0.8rem', fontSize: '2rem' }}>
+              Reto Táctico: Aprende de Capablanca
+            </h2>
+            <p style={{ color: '#888', maxWidth: '600px', margin: '0.5rem auto 0', fontSize: '0.95rem' }}>
+              Pon a prueba tu visión combinatoria resolviendo las jugadas maestras que hicieron inmortal al Gran Maestro José Raúl Capablanca.
+            </p>
+          </div>
+          <DailyTacticalPuzzle />
+        </div>
+      </section>
+
       {/* 7. Actualizaciones y Blog */}
       <section className="section" style={{ background: '#0d0d0d', color: '#fff' }}>
         <div className="wrap">

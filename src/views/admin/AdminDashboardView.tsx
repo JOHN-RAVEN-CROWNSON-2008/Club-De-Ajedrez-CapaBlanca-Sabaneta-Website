@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getSignedUrl, formatFileSize } from '../../lib/storage';
+import { FileUploadField } from '../../components/common/FileUploadField';
 import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
@@ -239,7 +241,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     const eventItem: ClubEvent = {
-      id: 'ev-' + Date.now(),
+      id: crypto.randomUUID(),
       title: newEvent.title,
       slug: newEvent.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       description: newEvent.description,
@@ -275,7 +277,7 @@ export const AdminDashboardView: React.FC = () => {
     e.preventDefault();
     const eventId = newMatch.event_id || (events[0]?.id ?? 'ev-1');
     const matchItem: TournamentMatch = {
-      id: 'mat-' + Date.now(),
+      id: crypto.randomUUID(),
       event_id: eventId,
       round: Number(newMatch.round) || 1,
       board_number: Number(newMatch.board_number) || 1,
@@ -388,7 +390,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleCreateTrophy = async (e: React.FormEvent) => {
     e.preventDefault();
     const item: ClubTrophy = {
-      id: 'tr-' + Date.now(),
+      id: crypto.randomUUID(),
       title: newTrophy.title,
       year: Number(newTrophy.year),
       category: newTrophy.category,
@@ -441,7 +443,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     const postItem: Post = {
-      id: 'post-' + Date.now(),
+      id: crypto.randomUUID(),
       title: newPost.title,
       slug: newPost.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       excerpt: newPost.excerpt,
@@ -470,8 +472,12 @@ export const AdminDashboardView: React.FC = () => {
   // Documento
   const handleCreateDoc = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newDoc.file_url || newDoc.file_url === '#') {
+      triggerNotice('Sube un archivo o pega un enlace antes de publicar el recurso');
+      return;
+    }
     const docItem: ClubDocument = {
-      id: 'doc-' + Date.now(),
+      id: crypto.randomUUID(),
       title: newDoc.title,
       description: newDoc.description,
       category: newDoc.category,
@@ -487,6 +493,7 @@ export const AdminDashboardView: React.FC = () => {
     }
     setDocuments([docItem, ...documents]);
     setShowDocModal(false);
+    setNewDoc({ title: '', description: '', category: 'Material de Estudio' as const, file_type: 'pdf', file_size: '2.1 MB', file_url: '#' });
     triggerNotice('Documento añadido');
   };
 
@@ -501,8 +508,12 @@ export const AdminDashboardView: React.FC = () => {
   // Galería Multimedia
   const handleCreateGalleryItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newGalleryItem.src) {
+      triggerNotice('Sube una fotografía o pega una URL antes de guardarla');
+      return;
+    }
     const item: GalleryItem = {
-      id: 'g-' + Date.now(),
+      id: crypto.randomUUID(),
       src: newGalleryItem.src,
       alt: newGalleryItem.alt || newGalleryItem.caption,
       caption: newGalleryItem.caption,
@@ -601,7 +612,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     const schItem: ClassSchedule = {
-      id: 'sch-' + Date.now(),
+      id: crypto.randomUUID(),
       category: newSchedule.category,
       trainer: newSchedule.trainer,
       day_of_week: newSchedule.day_of_week,
@@ -788,7 +799,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     const annItem: ClubAnnouncement = {
-      id: 'ann-' + Date.now(),
+      id: crypto.randomUUID(),
       title: newAnnouncement.title,
       message: newAnnouncement.message,
       level: newAnnouncement.level,
@@ -802,6 +813,16 @@ export const AdminDashboardView: React.FC = () => {
     setAnnouncements([annItem, ...announcements]);
     setShowAnnouncementModal(false);
     triggerNotice('Anuncio de alerta activado');
+  };
+
+  // Ver comprobante de pago (bucket privado, requiere URL firmada temporal)
+  const handleViewReceipt = async (receiptPath: string) => {
+    const url = await getSignedUrl('payment-receipts', receiptPath);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      triggerNotice('No se pudo abrir el comprobante. Verifica los permisos del bucket payment-receipts.');
+    }
   };
 
   // Aprobar / Rechazar Pago
@@ -865,54 +886,15 @@ export const AdminDashboardView: React.FC = () => {
   };
 
   const handleApproveApplication = async (app: MembershipApplication) => {
+    // Nota de arquitectura: `profiles.id` es una llave foránea hacia `auth.users(id)`,
+    // así que un perfil solo puede crearse cuando existe una cuenta real de autenticación.
+    // Por eso "aprobar" solo cambia el estado de la solicitud; la cuenta de acceso del
+    // afiliado se crea cuando esa persona se registra en el portal de Afiliados con el
+    // mismo correo (el trigger `handle_new_user` crea el perfil automáticamente).
     await handleUpdateApplicationStatus(app.id, 'approved');
-
-    const sanitizedUsername = `${app.applicant_name.toLowerCase().replace(/\s+/g, '')}.${app.applicant_lastname.toLowerCase().replace(/\s+/g, '').slice(0, 8)}`;
-    const newMember: UserProfile = {
-      id: `usr-${Date.now()}`,
-      usuario: sanitizedUsername,
-      nombre: app.applicant_name,
-      apellido: app.applicant_lastname,
-      correo: app.email,
-      telefono: app.phone,
-      doc_type: app.doc_type,
-      doc_number: app.doc_number,
-      fecha_nacimiento: app.birth_date || undefined,
-      edad: app.age || undefined,
-      municipio: app.municipality,
-      ciudad: `${app.municipality}, Antioquia`,
-      categoria_ajedrez: app.desired_category,
-      elo_rating: app.approximate_elo || 1200,
-      role: 'student',
-      estado: 'active',
-      created_at: new Date().toISOString(),
-    };
-
-    setMembers([newMember, ...members]);
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('profiles').insert({
-          id: newMember.id,
-          usuario: newMember.usuario,
-          nombre: newMember.nombre,
-          apellido: newMember.apellido,
-          correo: newMember.correo,
-          telefono: newMember.telefono,
-          doc_type: newMember.doc_type,
-          doc_number: newMember.doc_number,
-          municipio: newMember.municipio,
-          ciudad: newMember.ciudad,
-          categoria_ajedrez: newMember.categoria_ajedrez,
-          elo_rating: newMember.elo_rating,
-          role: newMember.role,
-          estado: newMember.estado,
-        });
-      } catch (err) {
-        console.error('Error al registrar nuevo perfil desde solicitud:', err);
-      }
-    }
-
-    triggerNotice(`¡Afiliación aprobada! ${app.applicant_name} fue incorporado como miembro activo con usuario @${sanitizedUsername}`);
+    triggerNotice(
+      `Solicitud de ${app.applicant_name} aprobada. Pide al afiliado registrarse en el Portal de Afiliados con el correo ${app.email} para activar su acceso.`
+    );
   };
 
   const handleDeleteApplication = async (appId: string) => {
@@ -2532,6 +2514,17 @@ export const AdminDashboardView: React.FC = () => {
                 <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
                   <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Añadir Nuevo Recurso</h3>
                   <form onSubmit={handleCreateDoc} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <FileUploadField
+                      bucket="documents"
+                      mode="public"
+                      folder="repositorio"
+                      accept=".pdf,.pgn,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                      label="Subir archivo (PDF, PGN, Word, Excel, imagen)"
+                      onUploaded={(url, file) => {
+                        const ext = file.name.split('.').pop()?.toLowerCase() || newDoc.file_type;
+                        setNewDoc({ ...newDoc, file_url: url, file_type: ext, file_size: formatFileSize(file.size) });
+                      }}
+                    />
                     <input
                       type="text"
                       required
@@ -2550,6 +2543,9 @@ export const AdminDashboardView: React.FC = () => {
                         <option value="Reglamento">Reglamento</option>
                         <option value="Partidas PGN">Partidas PGN</option>
                         <option value="Circulares">Circulares</option>
+                        <option value="Resolución">Resolución</option>
+                        <option value="Acta">Acta (Asamblea/Junta Directiva)</option>
+                        <option value="General">General</option>
                       </select>
                       <input
                         type="text"
@@ -2626,11 +2622,26 @@ export const AdminDashboardView: React.FC = () => {
                 <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
                   <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Nueva Fotografía para la Galería</h3>
                   <form onSubmit={handleCreateGalleryItem} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <FileUploadField
+                      bucket="gallery"
+                      mode="public"
+                      folder="club"
+                      accept="image/*"
+                      label="Subir fotografía desde tu equipo"
+                      onUploaded={(url) => setNewGalleryItem({ ...newGalleryItem, src: url })}
+                    />
+                    {newGalleryItem.src && (
+                      <img
+                        src={newGalleryItem.src}
+                        alt="Previsualización"
+                        style={{ maxHeight: '160px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #333' }}
+                      />
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                       <input
                         type="text"
                         required
-                        placeholder="Ruta o URL de la imagen (ej. assets/img/campeon-sub8.webp)"
+                        placeholder="O pega la ruta/URL de la imagen (ej. assets/img/campeon-sub8.webp)"
                         value={newGalleryItem.src}
                         onChange={(e) => setNewGalleryItem({ ...newGalleryItem, src: e.target.value })}
                         style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
@@ -3258,6 +3269,17 @@ export const AdminDashboardView: React.FC = () => {
                             >
                               <MessageCircle size={14} />
                             </button>
+                            {p.receipt_url && (
+                              <button
+                                type="button"
+                                onClick={() => handleViewReceipt(p.receipt_url!)}
+                                className="btn btn--sm"
+                                style={{ background: '#1a1a2e', color: '#90caf9', border: '1px solid #303f9f', padding: '0.3rem 0.5rem' }}
+                                title="Ver comprobante adjunto"
+                              >
+                                <Eye size={14} />
+                              </button>
+                            )}
                             {p.status === 'pending' && (
                               <>
                                 <button onClick={() => handleUpdatePaymentStatus(p.id, 'approved')} className="btn btn--primary btn--sm" style={{ padding: '0.3rem 0.6rem' }} title="Aprobar cuota">

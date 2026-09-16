@@ -543,5 +543,99 @@ VALUES
 ('Rodrigo', 'Henao Restrepo', 'CC', '71239845', '1988-03-10', 38, 'rodrigo.henao@outlook.com', '+57 315 678 1234', 'Sabaneta', 'Adultos & Aficionados', 1620, NULL, NULL, 'Nueva EPS', 'approved', 'Afiliación aprobada. Incorporado a entrenamientos sabatinos.')
 ON CONFLICT DO NOTHING;
 
+-- ==============================================================================
+-- 19. CATEGORÍAS ADICIONALES DE DOCUMENTOS: RESOLUCIONES Y ACTAS
+-- ==============================================================================
+-- El esquema original solo admitía 'General', 'Reglamento', 'Material de Estudio',
+-- 'Partidas PGN' y 'Circulares'. Se añaden 'Resolución' y 'Acta' para que la
+-- directiva pueda publicar resoluciones y actas de asamblea/junta directiva
+-- usando el mismo repositorio de documentos.
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT con.conname
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = 'public'
+          AND rel.relname = 'documents'
+          AND con.contype = 'c'
+          AND pg_get_constraintdef(con.oid) ILIKE '%category%'
+    LOOP
+        EXECUTE format('ALTER TABLE public.documents DROP CONSTRAINT %I', r.conname);
+    END LOOP;
+END $$;
+
+ALTER TABLE public.documents
+    ADD CONSTRAINT documents_category_check
+    CHECK (category IN ('General', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares', 'Resolución', 'Acta'));
+
+-- ==============================================================================
+-- 20. ALMACENAMIENTO (SUPABASE STORAGE): BUCKETS Y POLÍTICAS
+-- ==============================================================================
+-- gallery            -> fotografías del club (público, cualquiera puede ver la URL)
+-- documents          -> archivos, guías, reglamentos, resoluciones y actas (público)
+-- payment-receipts   -> soportes de pago de afiliados (privado, solo dueño + admin)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES
+    ('gallery', 'gallery', TRUE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
+    ('documents', 'documents', TRUE, 15728640, ARRAY['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/png', 'image/jpeg', 'text/plain']),
+    ('payment-receipts', 'payment-receipts', FALSE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
+ON CONFLICT (id) DO UPDATE SET
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- Galería: lectura pública (no requiere política porque el bucket es público),
+-- escritura solo para administradores.
+DROP POLICY IF EXISTS "gallery_admin_write" ON storage.objects;
+CREATE POLICY "gallery_admin_write" ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'gallery' AND public.is_admin());
+
+DROP POLICY IF EXISTS "gallery_admin_update" ON storage.objects;
+CREATE POLICY "gallery_admin_update" ON storage.objects FOR UPDATE
+    USING (bucket_id = 'gallery' AND public.is_admin());
+
+DROP POLICY IF EXISTS "gallery_admin_delete" ON storage.objects;
+CREATE POLICY "gallery_admin_delete" ON storage.objects FOR DELETE
+    USING (bucket_id = 'gallery' AND public.is_admin());
+
+-- Documentos (archivos, guías, resoluciones, actas): lectura pública,
+-- escritura solo para administradores.
+DROP POLICY IF EXISTS "documents_admin_write" ON storage.objects;
+CREATE POLICY "documents_admin_write" ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'documents' AND public.is_admin());
+
+DROP POLICY IF EXISTS "documents_admin_update" ON storage.objects;
+CREATE POLICY "documents_admin_update" ON storage.objects FOR UPDATE
+    USING (bucket_id = 'documents' AND public.is_admin());
+
+DROP POLICY IF EXISTS "documents_admin_delete" ON storage.objects;
+CREATE POLICY "documents_admin_delete" ON storage.objects FOR DELETE
+    USING (bucket_id = 'documents' AND public.is_admin());
+
+-- Soportes de pago: cada afiliado solo puede subir y leer dentro de su propia
+-- carpeta ({auth.uid()}/archivo.ext); los administradores pueden leer todas
+-- para validar cuotas. El bucket es privado: se accede con URLs firmadas.
+DROP POLICY IF EXISTS "receipts_owner_insert" ON storage.objects;
+CREATE POLICY "receipts_owner_insert" ON storage.objects FOR INSERT
+    WITH CHECK (
+        bucket_id = 'payment-receipts'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+DROP POLICY IF EXISTS "receipts_owner_or_admin_select" ON storage.objects;
+CREATE POLICY "receipts_owner_or_admin_select" ON storage.objects FOR SELECT
+    USING (
+        bucket_id = 'payment-receipts'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin())
+    );
+
+DROP POLICY IF EXISTS "receipts_admin_delete" ON storage.objects;
+CREATE POLICY "receipts_admin_delete" ON storage.objects FOR DELETE
+    USING (bucket_id = 'payment-receipts' AND public.is_admin());
+
 
 
