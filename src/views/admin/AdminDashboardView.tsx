@@ -19,13 +19,15 @@ import {
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal
+  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 import { DatabaseDiagnosticModal } from '../../components/common/DatabaseDiagnosticModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
+import { TournamentPairingModal } from '../../components/common/TournamentPairingModal';
+import { PairingAthlete } from '../../lib/tournamentPairings';
 import { whatsappService } from '../../services/whatsappService';
 import { AdminLoginView } from '../auth/AdminLoginView';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
@@ -150,6 +152,7 @@ export const AdminDashboardView: React.FC = () => {
   const [sqlCopied, setSqlCopied] = useState(false);
   const [showDbDiagnosticModal, setShowDbDiagnosticModal] = useState(false);
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
+  const [showPairingModal, setShowPairingModal] = useState(false);
 
   // Validar permisos
   useEffect(() => {
@@ -320,6 +323,66 @@ export const AdminDashboardView: React.FC = () => {
     setMatches(matches.filter((m) => m.id !== id));
     triggerNotice('Partida eliminada');
   };
+
+  const handleBatchSaveMatches = async (batch: Omit<TournamentMatch, 'id'>[]) => {
+    const timestamp = Date.now();
+    const formattedMatches: TournamentMatch[] = batch.map((item, idx) => ({
+      ...item,
+      id: `mat-${timestamp}-${idx}`,
+      created_at: new Date().toISOString(),
+    }));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('tournament_matches').insert(formattedMatches);
+      } catch (err) {
+        console.error('Error guardando partidas por lote en Supabase:', err);
+      }
+    }
+
+    setMatches((prev) => [...formattedMatches, ...prev]);
+    triggerNotice(`¡Se han generado e insertado ${formattedMatches.length} mesas/partidas en el torneo!`);
+  };
+
+  // Evento activo seleccionado para emparejar
+  const targetEventForPairing = events.find((e) => e.id === selectedTournamentFilter) || events[0];
+
+  // Atletas disponibles para emparejamiento automático
+  const athletesForPairing: PairingAthlete[] = React.useMemo(() => {
+    if (!targetEventForPairing) return [];
+
+    // 1. Inscripciones confirmadas del torneo
+    const eventRegs = registrations.filter(
+      (r) => r.event_id === targetEventForPairing.id && r.status !== 'cancelled'
+    );
+    if (eventRegs.length >= 2) {
+      return eventRegs.map((r) => {
+        const mem = members.find((m) => m.id === r.user_id);
+        const name = r.profile
+          ? `${r.profile.nombre} ${r.profile.apellido}`
+          : (mem ? `${mem.nombre} ${mem.apellido}` : 'Ajedrecista');
+        const elo = r.profile?.elo_rating || mem?.elo_rating || 1500;
+        return {
+          id: r.id,
+          name,
+          elo,
+          category: r.profile?.categoria_ajedrez || mem?.categoria_ajedrez,
+          club: 'Capablanca Sabaneta',
+        };
+      });
+    }
+
+    // 2. Si no hay suficientes inscritos específicos, usar los socios activos del club
+    return members
+      .filter((m) => m.estado === 'active' && m.role !== 'admin')
+      .map((m) => ({
+        id: m.id,
+        name: `${m.nombre} ${m.apellido}`,
+        elo: m.elo_rating || 1500,
+        category: m.categoria_ajedrez,
+        club: 'Capablanca Sabaneta',
+      }));
+  }, [targetEventForPairing, registrations, members]);
 
   // Palmarés y Cuadro de Honor Histórico
   const handleCreateTrophy = async (e: React.FormEvent) => {
@@ -1599,6 +1662,15 @@ export const AdminDashboardView: React.FC = () => {
                         <option key={ev.id} value={ev.id}>{ev.title}</option>
                       ))}
                     </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPairingModal(true)}
+                      className="btn btn--secondary btn--sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--gold)', color: 'var(--gold)' }}
+                    >
+                      <Wand2 size={16} /> Asistente de Emparejamientos
+                    </button>
 
                     <button
                       onClick={() => setShowMatchModal(true)}
@@ -3813,6 +3885,16 @@ export const AdminDashboardView: React.FC = () => {
           isOpen={true}
           onClose={() => setTournamentCertModalData(null)}
           data={tournamentCertModalData}
+        />
+      )}
+
+      {/* Modal Asistente de Emparejamientos de Torneo */}
+      {showPairingModal && targetEventForPairing && (
+        <TournamentPairingModal
+          event={targetEventForPairing}
+          athletes={athletesForPairing}
+          onClose={() => setShowPairingModal(false)}
+          onSaveMatches={handleBatchSaveMatches}
         />
       )}
 
