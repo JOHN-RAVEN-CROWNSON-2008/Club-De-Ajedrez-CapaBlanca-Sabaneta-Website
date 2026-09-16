@@ -14,9 +14,10 @@ import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle';
+import { MemberLoginView } from '../auth/MemberLoginView';
 
 export const MembersDashboardView: React.FC = () => {
-  const { user, logout, updateProfile, isConfigured } = useAuth();
+  const { user, loading, logout, updateProfile, isConfigured } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'documentos' | 'torneos' | 'pagos' | 'horarios' | 'perfil'>('documentos');
@@ -206,7 +207,20 @@ export const MembersDashboardView: React.FC = () => {
     setTimeout(() => setNotice(''), 4000);
   };
 
-  if (!user) return null;
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: '40px', height: '40px', border: '3px solid #222', borderTopColor: 'var(--gold)', borderRadius: '50%', margin: '0 auto 1rem' }} />
+          <p style={{ fontSize: '0.9rem', color: '#888' }}>Cargando Portal de Afiliados...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <MemberLoginView />;
+  }
 
   const filteredDocs = documents.filter((doc) => {
     const matchesCategory = selectedDocCategory === 'all' || doc.category === selectedDocCategory;

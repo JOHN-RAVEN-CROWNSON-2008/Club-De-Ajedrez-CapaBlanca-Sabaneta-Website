@@ -74,6 +74,24 @@ export const whatsappService = {
   },
 
   /**
+   * Abre mensaje de bienvenida y citación a clase diagnóstica para una solicitud de admisión
+   */
+  openApplicationContact(param1: string, param2: string, category: string, applicationCode?: string) {
+    let phone = param1;
+    let applicantName = param2;
+    // Si param2 tiene formato de teléfono (dígitos) y param1 es el nombre:
+    if (param2.replace(/[^0-9]/g, '').length >= 7 && param1.replace(/[^0-9]/g, '').length < 7) {
+      applicantName = param1;
+      phone = param2;
+    }
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const codeRef = applicationCode ? ` (Radicado: ${applicationCode})` : '';
+    const msg = `¡Hola ${applicantName}! 👋 Te saludamos desde la dirección deportiva del Club de Ajedrez Capablanca Sabaneta ♞. Recibimos tu solicitud de afiliación${codeRef} para la categoría "${category}". Nos complace invitarte a nuestra sede en el CC Aves María (piso 3) para realizar tu clase diagnóstica sin costo e integrarte a los entrenamientos. ¿Qué día te gustaría venir?`;
+    this.openChat(msg, fullPhone);
+  },
+
+  /**
    * Despacho a través de WhatsApp Cloud API (para automatizaciones del backend o webhook de servidor)
    */
   async sendCloudMessage(recipientPhone: string, messageText: string): Promise<{ success: boolean; data?: unknown; error?: string }> {

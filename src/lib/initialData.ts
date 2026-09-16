@@ -1,7 +1,7 @@
 import {
   SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration,
-  ClassAttendance, ClubTrophy
+  ClassAttendance, ClubTrophy, MembershipApplication
 } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
@@ -564,6 +564,68 @@ export const INITIAL_TROPHIES: ClubTrophy[] = [
     created_at: '2023-06-24T15:00:00Z',
   }
 ];
+
+export const INITIAL_APPLICATIONS: MembershipApplication[] = [
+  {
+    id: 'app-1',
+    applicant_name: 'Alejandro',
+    applicant_lastname: 'Giraldo Zuluaga',
+    doc_type: 'TI',
+    doc_number: '1035982110',
+    birth_date: '2014-07-15',
+    age: 12,
+    email: 'familia.giraldo@gmail.com',
+    phone: '312 778 9901',
+    municipality: 'Sabaneta',
+    desired_category: 'Semillero Sub-12',
+    approximate_elo: 1150,
+    guardian_name: 'Claudia Zuluaga',
+    guardian_phone: '312 778 9901',
+    health_provider: 'Sura',
+    status: 'pending',
+    notes: 'Juega en la escuela primaria, le interesa competir en torneos de la Liga.',
+    created_at: '2026-09-14T15:30:00Z',
+  },
+  {
+    id: 'app-2',
+    applicant_name: 'Mariana',
+    applicant_lastname: 'Ochoa Castro',
+    doc_type: 'RC',
+    doc_number: '1152899012',
+    birth_date: '2019-03-22',
+    age: 7,
+    email: 'esteban.ochoa@ajedrez.com',
+    phone: '300 456 1234',
+    municipality: 'Sabaneta',
+    desired_category: 'Iniciación Infantil (4 a 8 años)',
+    approximate_elo: 0,
+    guardian_name: 'Esteban Ochoa',
+    guardian_phone: '300 456 1234',
+    health_provider: 'Sanitas',
+    status: 'contacted',
+    notes: 'Iniciación desde cero, interesada en clases de martes y jueves.',
+    created_at: '2026-09-12T10:15:00Z',
+  },
+  {
+    id: 'app-3',
+    applicant_name: 'Julián',
+    applicant_lastname: 'Cardona Mesa',
+    doc_type: 'CC',
+    doc_number: '1036987451',
+    birth_date: '1998-11-05',
+    age: 27,
+    email: 'julian.cardona98@outlook.com',
+    phone: '318 221 8890',
+    municipality: 'Envigado',
+    desired_category: 'Adultos & Aficionados',
+    approximate_elo: 1400,
+    health_provider: 'Sura',
+    status: 'approved',
+    notes: 'Aficionado activo en plataformas online con rating 1600 en Lichess.',
+    created_at: '2026-09-10T18:45:00Z',
+  }
+];
+
 
 
 

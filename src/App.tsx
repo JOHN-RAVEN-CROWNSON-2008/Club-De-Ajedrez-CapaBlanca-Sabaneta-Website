@@ -15,6 +15,7 @@ import { GalleryView } from './views/public/GalleryView';
 import { ContactView } from './views/public/ContactView';
 import { VerifyCertificateView } from './views/public/VerifyCertificateView';
 import { ChessClockView } from './views/public/ChessClockView';
+import { MembershipApplicationView } from './views/public/MembershipApplicationView';
 
 // Auth views
 import { MemberLoginView } from './views/auth/MemberLoginView';
@@ -79,6 +80,7 @@ export const App: React.FC = () => {
             <Route path="/blog/:slug" element={<PublicLayout><BlogPostView /></PublicLayout>} />
             <Route path="/galeria" element={<PublicLayout><GalleryView /></PublicLayout>} />
             <Route path="/contacto" element={<PublicLayout><ContactView /></PublicLayout>} />
+            <Route path="/afiliarse" element={<PublicLayout><MembershipApplicationView /></PublicLayout>} />
             <Route path="/verificar" element={<PublicLayout><VerifyCertificateView /></PublicLayout>} />
             <Route path="/reloj" element={<ChessClockView />} />
 

@@ -6,28 +6,29 @@ import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
   INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS,
-  INITIAL_ATTENDANCE, INITIAL_TROPHIES
+  INITIAL_ATTENDANCE, INITIAL_TROPHIES, INITIAL_APPLICATIONS
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
   GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus,
-  ClubTrophy, TrophyType
+  ClubTrophy, TrophyType, MembershipApplication, ApplicationStatus
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList, Crown
+  UserCheck, UserX, ClipboardList, Crown, UserPlus
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
 import { whatsappService } from '../../services/whatsappService';
+import { AdminLoginView } from '../auth/AdminLoginView';
 
 export const AdminDashboardView: React.FC = () => {
-  const { user, role, logout } = useAuth();
+  const { user, role, loading, logout } = useAuth();
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState<
@@ -42,6 +43,9 @@ export const AdminDashboardView: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
+  const [applications, setApplications] = useState<MembershipApplication[]>(INITIAL_APPLICATIONS);
+  const [membersSubTab, setMembersSubTab] = useState<'active' | 'applications'>('active');
+  const [applicationFilter, setApplicationFilter] = useState<'all' | ApplicationStatus>('all');
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [attendance, setAttendance] = useState<ClassAttendance[]>(INITIAL_ATTENDANCE);
@@ -195,6 +199,9 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: anns } = await supabase.from('club_announcements').select('*');
         if (anns && anns.length > 0) setAnnouncements(anns as ClubAnnouncement[]);
+
+        const { data: apps } = await supabase.from('membership_applications').select('*').order('created_at', { ascending: false });
+        if (apps && apps.length > 0) setApplications(apps as MembershipApplication[]);
 
         const { data: msgs } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
         if (msgs && msgs.length > 0) setMessages(msgs as ContactMessage[]);
@@ -775,6 +782,119 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Archivo CSV de afiliados descargado exitosamente');
   };
 
+  // Gestión de Solicitudes de Afiliación
+  const handleUpdateApplicationStatus = async (appId: string, newStatus: ApplicationStatus) => {
+    setApplications(applications.map((a) => (a.id === appId ? { ...a, status: newStatus } : a)));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('membership_applications').update({ status: newStatus }).eq('id', appId);
+      } catch (err) {
+        console.error('Error al actualizar estado de solicitud:', err);
+      }
+    }
+    const statusLabel = newStatus === 'approved' ? 'Aprobada' : newStatus === 'contacted' ? 'Marcada como Contactada' : 'Rechazada/Archivada';
+    triggerNotice(`Solicitud de admisión ${statusLabel}`);
+  };
+
+  const handleApproveApplication = async (app: MembershipApplication) => {
+    await handleUpdateApplicationStatus(app.id, 'approved');
+
+    const sanitizedUsername = `${app.applicant_name.toLowerCase().replace(/\s+/g, '')}.${app.applicant_lastname.toLowerCase().replace(/\s+/g, '').slice(0, 8)}`;
+    const newMember: UserProfile = {
+      id: `usr-${Date.now()}`,
+      usuario: sanitizedUsername,
+      nombre: app.applicant_name,
+      apellido: app.applicant_lastname,
+      correo: app.email,
+      telefono: app.phone,
+      doc_type: app.doc_type,
+      doc_number: app.doc_number,
+      fecha_nacimiento: app.birth_date || undefined,
+      edad: app.age || undefined,
+      municipio: app.municipality,
+      ciudad: `${app.municipality}, Antioquia`,
+      categoria_ajedrez: app.desired_category,
+      elo_rating: app.approximate_elo || 1200,
+      role: 'student',
+      estado: 'active',
+      created_at: new Date().toISOString(),
+    };
+
+    setMembers([newMember, ...members]);
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('profiles').insert({
+          id: newMember.id,
+          usuario: newMember.usuario,
+          nombre: newMember.nombre,
+          apellido: newMember.apellido,
+          correo: newMember.correo,
+          telefono: newMember.telefono,
+          doc_type: newMember.doc_type,
+          doc_number: newMember.doc_number,
+          municipio: newMember.municipio,
+          ciudad: newMember.ciudad,
+          categoria_ajedrez: newMember.categoria_ajedrez,
+          elo_rating: newMember.elo_rating,
+          role: newMember.role,
+          estado: newMember.estado,
+        });
+      } catch (err) {
+        console.error('Error al registrar nuevo perfil desde solicitud:', err);
+      }
+    }
+
+    triggerNotice(`¡Afiliación aprobada! ${app.applicant_name} fue incorporado como miembro activo con usuario @${sanitizedUsername}`);
+  };
+
+  const handleDeleteApplication = async (appId: string) => {
+    if (!confirm('¿Deseas eliminar definitivamente este registro de solicitud?')) return;
+    setApplications(applications.filter((a) => a.id !== appId));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('membership_applications').delete().eq('id', appId);
+      } catch (err) {
+        console.error('Error al eliminar solicitud en Supabase:', err);
+      }
+    }
+    triggerNotice('Registro de solicitud eliminado');
+  };
+
+  const handleExportApplicationsCSV = () => {
+    const headers = ['ID', 'Nombres', 'Apellidos', 'Doc Tipo', 'Doc Numero', 'Fecha Nac.', 'Edad', 'Correo', 'Telefono', 'Municipio', 'Categoria Solicitada', 'Elo', 'Acudiente', 'Tel Acudiente', 'EPS', 'Estado', 'Notas / Radicado', 'Fecha Radicado'];
+    const rows = applications.map((a) => [
+      a.id,
+      a.applicant_name,
+      a.applicant_lastname,
+      a.doc_type,
+      a.doc_number,
+      a.birth_date || '',
+      a.age || '',
+      a.email,
+      a.phone,
+      a.municipality,
+      a.desired_category,
+      a.approximate_elo || 0,
+      a.guardian_name || '',
+      a.guardian_phone || '',
+      a.health_provider || '',
+      a.status,
+      a.notes || '',
+      a.created_at || '',
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.map((f) => `"${(f + '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Solicitudes_Afiliacion_Capablanca_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    triggerNotice('Archivo CSV de solicitudes descargado exitosamente');
+  };
+
   // Exportar Backup Integral de la Plataforma en JSON
   const handleExportFullJsonBackup = () => {
     const backupData = {
@@ -785,6 +905,7 @@ export const AdminDashboardView: React.FC = () => {
       tables: {
         site_settings: settings,
         profiles: members,
+        membership_applications: applications,
         events: events,
         tournament_matches: matches,
         tournament_registrations: registrations,
@@ -810,7 +931,20 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Copia de seguridad completa (JSON) exportada exitosamente');
   };
 
-  if (!user) return null;
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: '40px', height: '40px', border: '3px solid #222', borderTopColor: 'var(--gold)', borderRadius: '50%', margin: '0 auto 1rem' }} />
+          <p style={{ fontSize: '0.9rem', color: '#888' }}>Cargando Panel de Administración...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || (role !== 'admin' && user.role !== 'admin')) {
+    return <AdminLoginView />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#fff', display: 'flex', flexDirection: 'column' }}>
@@ -1086,6 +1220,7 @@ export const AdminDashboardView: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem', marginBottom: '1.5rem' }}>
                   {[
                     { name: 'Afiliados', count: members.length },
+                    { name: 'Solicitudes', count: applications.length },
                     { name: 'Torneos', count: events.length },
                     { name: 'Partidas PGN', count: matches.length },
                     { name: 'Inscripciones', count: registrations.length },
@@ -2152,189 +2287,493 @@ export const AdminDashboardView: React.FC = () => {
           {/* 6. SECCIÓN: AFILIADOS & ROLES */}
           {activeSection === 'members' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+              {/* Cabecera de la Sección Afiliados */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
-                    Control de Afiliados y Roles
+                    Control de Afiliados y Admisiones
                   </h1>
                   <p style={{ color: '#888', margin: 0 }}>
-                    Administra los permisos, categorías deportivas y Elo de los miembros
+                    Administra el padrón de deportistas activos, categorías y solicitudes de vinculación en línea
                   </p>
                 </div>
-                <button onClick={handleExportMembersCSV} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Download size={16} />
-                  <span>Exportar Lista a CSV</span>
+                {membersSubTab === 'active' ? (
+                  <button onClick={handleExportMembersCSV} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Download size={16} />
+                    <span>Exportar Lista a CSV</span>
+                  </button>
+                ) : (
+                  <button onClick={handleExportApplicationsCSV} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Download size={16} />
+                    <span>Exportar Solicitudes a CSV</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Pestañas de Navegación: Activos vs Solicitudes */}
+              <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #282828', marginBottom: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setMembersSubTab('active')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: membersSubTab === 'active' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: membersSubTab === 'active' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <Users size={16} />
+                  <span>Afiliados Activos & Roles ({members.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMembersSubTab('applications')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: membersSubTab === 'applications' ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: membersSubTab === 'applications' ? 'var(--gold)' : '#888',
+                    fontWeight: 700,
+                    padding: '0.6rem 1.2rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <UserPlus size={16} />
+                  <span>Solicitudes de Admisión & Afiliación ({applications.length})</span>
+                  {applications.filter(a => a.status === 'pending').length > 0 && (
+                    <span style={{ background: '#f59e0b', color: '#000', fontSize: '0.7rem', padding: '0.1rem 0.45rem', borderRadius: '50px', fontWeight: 800 }}>
+                      {applications.filter(a => a.status === 'pending').length}
+                    </span>
+                  )}
                 </button>
               </div>
 
-              {/* Modal de Edición de Deportista */}
-              {editingMember && (
-                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
-                  <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>
-                    Editar Ficha Deportiva: {editingMember.nombre} {editingMember.apellido}
-                  </h3>
-                  <form onSubmit={handleSaveMemberProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Categoría de Ajedrez</label>
-                        <input
-                          type="text"
-                          value={editingMember.categoria_ajedrez || ''}
-                          onChange={(e) => setEditingMember({ ...editingMember, categoria_ajedrez: e.target.value })}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rating Elo</label>
-                        <input
-                          type="number"
-                          value={editingMember.elo_rating || 0}
-                          onChange={(e) => setEditingMember({ ...editingMember, elo_rating: Number(e.target.value) })}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>ID FIDE Oficial</label>
-                        <input
-                          type="text"
-                          value={editingMember.fide_id || ''}
-                          onChange={(e) => setEditingMember({ ...editingMember, fide_id: e.target.value })}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                        />
-                      </div>
-                    </div>
+              {/* Sub-Pestaña 1: Afiliados Activos */}
+              {membersSubTab === 'active' && (
+                <div>
+                  {/* Modal de Edición de Deportista */}
+                  {editingMember && (
+                    <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                      <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>
+                        Editar Ficha Deportiva: {editingMember.nombre} {editingMember.apellido}
+                      </h3>
+                      <form onSubmit={handleSaveMemberProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Categoría de Ajedrez</label>
+                            <input
+                              type="text"
+                              value={editingMember.categoria_ajedrez || ''}
+                              onChange={(e) => setEditingMember({ ...editingMember, categoria_ajedrez: e.target.value })}
+                              style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rating Elo</label>
+                            <input
+                              type="number"
+                              value={editingMember.elo_rating || 0}
+                              onChange={(e) => setEditingMember({ ...editingMember, elo_rating: Number(e.target.value) })}
+                              style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>ID FIDE Oficial</label>
+                            <input
+                              type="text"
+                              value={editingMember.fide_id || ''}
+                              onChange={(e) => setEditingMember({ ...editingMember, fide_id: e.target.value })}
+                              style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                            />
+                          </div>
+                        </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rol en Plataforma</label>
-                        <select
-                          value={editingMember.role}
-                          onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value as any })}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                        >
-                          <option value="student">Afiliado / Alumno</option>
-                          <option value="admin">Administrador Directivo</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Estado de Membresía</label>
-                        <select
-                          value={editingMember.estado}
-                          onChange={(e) => setEditingMember({ ...editingMember, estado: e.target.value as any })}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                        >
-                          <option value="active">Activo</option>
-                          <option value="inactive">Inactivo</option>
-                          <option value="pending">Pendiente</option>
-                        </select>
-                      </div>
-                    </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rol en Plataforma</label>
+                            <select
+                              value={editingMember.role}
+                              onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value as any })}
+                              style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                            >
+                              <option value="student">Afiliado / Alumno</option>
+                              <option value="admin">Administrador Directivo</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Estado de Membresía</label>
+                            <select
+                              value={editingMember.estado}
+                              onChange={(e) => setEditingMember({ ...editingMember, estado: e.target.value as any })}
+                              style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                            >
+                              <option value="active">Activo</option>
+                              <option value="inactive">Inactivo</option>
+                              <option value="pending">Pendiente</option>
+                            </select>
+                          </div>
+                        </div>
 
-                    <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.5rem' }}>
-                      <button type="submit" className="btn btn--primary btn--sm">Guardar Ficha</button>
-                      <button type="button" onClick={() => setEditingMember(null)} className="btn btn--ghost btn--sm">Cancelar</button>
+                        <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.5rem' }}>
+                          <button type="submit" className="btn btn--primary btn--sm">Guardar Ficha</button>
+                          <button type="button" onClick={() => setEditingMember(null)} className="btn btn--ghost btn--sm">Cancelar</button>
+                        </div>
+                      </form>
                     </div>
-                  </form>
+                  )}
+
+                  {/* Buscador de Afiliados */}
+                  <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                    <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre, correo, usuario o categoría..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '8px', background: '#141414', border: '1px solid #333', color: '#fff' }}
+                    />
+                  </div>
+
+                  <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr style={{ background: '#1e1e1e', borderBottom: '1px solid #333', color: '#aaa', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                          <th style={{ padding: '1rem' }}>Afiliado</th>
+                          <th style={{ padding: '1rem' }}>Correo</th>
+                          <th style={{ padding: '1rem' }}>Categoría</th>
+                          <th style={{ padding: '1rem' }}>Elo</th>
+                          <th style={{ padding: '1rem' }}>Rol</th>
+                          <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {members
+                          .filter((m) =>
+                            m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            m.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (m.categoria_ajedrez || '').toLowerCase().includes(searchTerm.toLowerCase())
+                          )
+                          .map((m) => (
+                            <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
+                              <td style={{ padding: '1rem', fontWeight: 600 }}>
+                                {m.nombre} {m.apellido}
+                                <div style={{ fontSize: '0.75rem', color: '#888' }}>@{m.usuario}</div>
+                              </td>
+                              <td style={{ padding: '1rem', color: '#ccc' }}>{m.correo}</td>
+                              <td style={{ padding: '1rem', color: 'var(--gold)' }}>{m.categoria_ajedrez || 'Iniciación'}</td>
+                              <td style={{ padding: '1rem' }}>{m.elo_rating || '—'}</td>
+                              <td style={{ padding: '1rem' }}>
+                                <span style={{
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  background: m.role === 'admin' ? '#ffd54f' : '#2e2e2e',
+                                  color: m.role === 'admin' ? '#000' : '#ccc',
+                                }}>
+                                  {m.role}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                                  <button
+                                    onClick={() => setCertificateMember(m)}
+                                    className="btn btn--ghost btn--sm"
+                                    style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
+                                    title="Generar Certificado Oficial de Afiliación"
+                                  >
+                                    <Award size={12} />
+                                    <span>Certificado</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setCardMember(m)}
+                                    className="btn btn--ghost btn--sm"
+                                    style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                    title="Generar Carnet Digital de Afiliado"
+                                  >
+                                    <CreditCard size={12} />
+                                    <span>Carnet</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingMember(m)}
+                                    className="btn btn--ghost btn--sm"
+                                    style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                    title="Editar ficha deportiva"
+                                  >
+                                    <Edit size={12} />
+                                    <span>Editar</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleMemberRole(m.id, m.role)}
+                                    className="btn btn--ghost btn--sm"
+                                    style={{ fontSize: '0.75rem' }}
+                                  >
+                                    Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
-              {/* Buscador */}
-              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-                <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre, correo, usuario o categoría..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '8px', background: '#141414', border: '1px solid #333', color: '#fff' }}
-                />
-              </div>
+              {/* Sub-Pestaña 2: Solicitudes de Admisión & Afiliación */}
+              {membersSubTab === 'applications' && (
+                <div>
+                  {/* Filtros de Estado */}
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.2rem' }}>
+                    {[
+                      { id: 'all', label: 'Todas las Solicitudes', count: applications.length },
+                      { id: 'pending', label: 'Pendientes', count: applications.filter(a => a.status === 'pending').length },
+                      { id: 'contacted', label: 'Contactadas', count: applications.filter(a => a.status === 'contacted').length },
+                      { id: 'approved', label: 'Aprobadas', count: applications.filter(a => a.status === 'approved').length },
+                      { id: 'rejected', label: 'Rechazadas / Archivadas', count: applications.filter(a => a.status === 'rejected').length },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setApplicationFilter(f.id as any)}
+                        style={{
+                          background: applicationFilter === f.id ? 'var(--gold)' : '#181818',
+                          color: applicationFilter === f.id ? '#000' : '#ccc',
+                          border: `1px solid ${applicationFilter === f.id ? 'var(--gold)' : '#333'}`,
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '50px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                      >
+                        <span>{f.label}</span>
+                        <span style={{
+                          background: applicationFilter === f.id ? '#000' : '#282828',
+                          color: applicationFilter === f.id ? 'var(--gold)' : '#aaa',
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: '50px',
+                          fontSize: '0.72rem'
+                        }}>
+                          {f.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
 
-              <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                  <thead>
-                    <tr style={{ background: '#1e1e1e', borderBottom: '1px solid #333', color: '#aaa', textTransform: 'uppercase', fontSize: '0.75rem' }}>
-                      <th style={{ padding: '1rem' }}>Afiliado</th>
-                      <th style={{ padding: '1rem' }}>Correo</th>
-                      <th style={{ padding: '1rem' }}>Categoría</th>
-                      <th style={{ padding: '1rem' }}>Elo</th>
-                      <th style={{ padding: '1rem' }}>Rol</th>
-                      <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members
-                      .filter((m) =>
-                        m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        m.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (m.categoria_ajedrez || '').toLowerCase().includes(searchTerm.toLowerCase())
-                      )
-                      .map((m) => (
-                        <tr key={m.id} style={{ borderBottom: '1px solid #222' }}>
-                          <td style={{ padding: '1rem', fontWeight: 600 }}>
-                            {m.nombre} {m.apellido}
-                            <div style={{ fontSize: '0.75rem', color: '#888' }}>@{m.usuario}</div>
-                          </td>
-                          <td style={{ padding: '1rem', color: '#ccc' }}>{m.correo}</td>
-                          <td style={{ padding: '1rem', color: 'var(--gold)' }}>{m.categoria_ajedrez || 'Iniciación'}</td>
-                          <td style={{ padding: '1rem' }}>{m.elo_rating || '—'}</td>
-                          <td style={{ padding: '1rem' }}>
-                            <span style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: m.role === 'admin' ? '#ffd54f' : '#2e2e2e',
-                              color: m.role === 'admin' ? '#000' : '#ccc',
-                            }}>
-                              {m.role}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                              <button
-                                onClick={() => setCertificateMember(m)}
-                                className="btn btn--ghost btn--sm"
-                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
-                                title="Generar Certificado Oficial de Afiliación"
-                              >
-                                <Award size={12} />
-                                <span>Certificado</span>
-                              </button>
-                              <button
-                                onClick={() => setCardMember(m)}
-                                className="btn btn--ghost btn--sm"
-                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                                title="Generar Carnet Digital de Afiliado"
-                              >
-                                <CreditCard size={12} />
-                                <span>Carnet</span>
-                              </button>
-                              <button
-                                onClick={() => setEditingMember(m)}
-                                className="btn btn--ghost btn--sm"
-                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                                title="Editar ficha deportiva"
-                              >
-                                <Edit size={12} />
-                                <span>Editar</span>
-                              </button>
-                              <button
-                                onClick={() => handleToggleMemberRole(m.id, m.role)}
-                                className="btn btn--ghost btn--sm"
-                                style={{ fontSize: '0.75rem' }}
-                              >
-                                Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
-                              </button>
-                            </div>
-                          </td>
+                  {/* Buscador de Solicitudes */}
+                  <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                    <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre, documento, correo, municipio o categoría..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.6rem', borderRadius: '8px', background: '#141414', border: '1px solid #333', color: '#fff' }}
+                    />
+                  </div>
+
+                  {/* Listado de Solicitudes */}
+                  <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                      <thead>
+                        <tr style={{ background: '#1e1e1e', borderBottom: '1px solid #333', color: '#aaa', textTransform: 'uppercase', fontSize: '0.74rem' }}>
+                          <th style={{ padding: '1rem' }}>Aspirante & Documento</th>
+                          <th style={{ padding: '1rem' }}>Categoría & Nivel</th>
+                          <th style={{ padding: '1rem' }}>Contacto & Acudiente</th>
+                          <th style={{ padding: '1rem' }}>Estado</th>
+                          <th style={{ padding: '1rem', textAlign: 'right' }}>Gestión & Acciones</th>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {applications
+                          .filter((app) => {
+                            if (applicationFilter !== 'all' && app.status !== applicationFilter) return false;
+                            const search = searchTerm.toLowerCase();
+                            return (
+                              app.applicant_name.toLowerCase().includes(search) ||
+                              app.applicant_lastname.toLowerCase().includes(search) ||
+                              app.doc_number.includes(search) ||
+                              app.email.toLowerCase().includes(search) ||
+                              app.desired_category.toLowerCase().includes(search) ||
+                              (app.municipality || '').toLowerCase().includes(search) ||
+                              (app.notes || '').toLowerCase().includes(search)
+                            );
+                          })
+                          .map((app) => {
+                            const fullName = `${app.applicant_name} ${app.applicant_lastname}`.trim();
+                            const radicadoMatch = (app.notes || '').match(/SOL-CAPA-\d+-2026/);
+                            const radicadoCode = radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${app.id.slice(0, 6).toUpperCase()}-2026`;
+
+                            return (
+                              <tr key={app.id} style={{ borderBottom: '1px solid #222' }}>
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>{fullName}</div>
+                                  <div style={{ fontSize: '0.78rem', color: '#aaa', marginTop: '0.15rem' }}>
+                                    {app.doc_type} {app.doc_number} · {app.age ? `${app.age} años` : 'Edad N/D'}
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', color: '#888', marginTop: '0.15rem' }}>
+                                    {app.municipality} · EPS: {app.health_provider || 'Particular'}
+                                  </div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--gold)', fontWeight: 600, marginTop: '0.25rem' }}>
+                                    {radicadoCode}
+                                  </div>
+                                </td>
+
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ color: 'var(--gold)', fontWeight: 600 }}>{app.desired_category}</div>
+                                  <div style={{ fontSize: '0.8rem', color: '#bbb', marginTop: '0.2rem' }}>
+                                    Elo Est: <strong style={{ color: '#fff' }}>{app.approximate_elo || 0}</strong>
+                                  </div>
+                                  {app.notes && (
+                                    <div style={{ fontSize: '0.75rem', color: '#777', fontStyle: 'italic', marginTop: '0.3rem', maxWidth: '240px', lineHeight: 1.4 }}>
+                                      "{app.notes}"
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td style={{ padding: '1rem' }}>
+                                  <div style={{ color: '#ccc', fontSize: '0.85rem' }}>{app.email}</div>
+                                  <div style={{ color: '#888', fontSize: '0.82rem', marginTop: '0.15rem' }}>
+                                    Tel: <span style={{ color: '#fff' }}>{app.phone}</span>
+                                  </div>
+                                  {app.guardian_name && (
+                                    <div style={{ fontSize: '0.75rem', color: '#93c5fd', marginTop: '0.25rem' }}>
+                                      Acudiente: {app.guardian_name} ({app.guardian_phone || 'Sin tel.'})
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td style={{ padding: '1rem' }}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    padding: '0.25rem 0.65rem',
+                                    borderRadius: '50px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background:
+                                      app.status === 'approved' ? 'rgba(34,197,94,0.15)' :
+                                      app.status === 'contacted' ? 'rgba(59,130,246,0.15)' :
+                                      app.status === 'rejected' ? 'rgba(239,68,68,0.15)' :
+                                      'rgba(245,158,11,0.15)',
+                                    color:
+                                      app.status === 'approved' ? '#4ade80' :
+                                      app.status === 'contacted' ? '#60a5fa' :
+                                      app.status === 'rejected' ? '#f87171' :
+                                      '#fbbf24',
+                                    border: `1px solid ${
+                                      app.status === 'approved' ? '#15803d' :
+                                      app.status === 'contacted' ? '#1d4ed8' :
+                                      app.status === 'rejected' ? '#b91c1c' :
+                                      '#b45309'
+                                    }`
+                                  }}>
+                                    {app.status === 'approved' ? 'Aprobada' :
+                                     app.status === 'contacted' ? 'Contactada' :
+                                     app.status === 'rejected' ? 'Rechazada' :
+                                     'Pendiente'}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                  <div style={{ display: 'inline-flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                    {/* Botón WhatsApp */}
+                                    <button
+                                      type="button"
+                                      onClick={() => whatsappService.openApplicationContact(fullName, app.phone, app.desired_category, radicadoCode)}
+                                      className="btn btn--sm"
+                                      style={{ background: '#25D366', color: '#fff', border: 'none', padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                      title="Enviar mensaje de contacto y bienvenida vía WhatsApp"
+                                    >
+                                      <MessageCircle size={13} />
+                                      <span>WhatsApp</span>
+                                    </button>
+
+                                    {/* Botón Aprobar */}
+                                    {app.status !== 'approved' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleApproveApplication(app)}
+                                        className="btn btn--primary btn--sm"
+                                        style={{ background: '#16a34a', borderColor: '#15803d', padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                        title="Aprobar e incorporar automáticamente al padrón de deportistas activos"
+                                      >
+                                        <UserCheck size={13} />
+                                        <span>Aprobar</span>
+                                      </button>
+                                    )}
+
+                                    {/* Botón Contactar */}
+                                    {app.status === 'pending' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateApplicationStatus(app.id, 'contacted')}
+                                        className="btn btn--ghost btn--sm"
+                                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#3b82f6', color: '#60a5fa' }}
+                                        title="Marcar solicitud como contactada"
+                                      >
+                                        <span>Contactada</span>
+                                      </button>
+                                    )}
+
+                                    {/* Botón Rechazar */}
+                                    {app.status !== 'rejected' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateApplicationStatus(app.id, 'rejected')}
+                                        className="btn btn--ghost btn--sm"
+                                        style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#444', color: '#888' }}
+                                        title="Archivar o rechazar solicitud"
+                                      >
+                                        <UserX size={13} />
+                                      </button>
+                                    )}
+
+                                    {/* Botón Eliminar */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteApplication(app.id)}
+                                      className="btn btn--ghost btn--sm"
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: '#7f1d1d', color: '#f87171' }}
+                                      title="Eliminar registro"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {applications.length === 0 && (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#777' }}>
+                              No hay solicitudes de afiliación registradas hasta el momento.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
+
 
           {/* 7. SECCIÓN: CUOTAS & PAGOS DE AFILIADOS */}
           {activeSection === 'payments' && (

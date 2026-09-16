@@ -309,7 +309,31 @@ CREATE TABLE IF NOT EXISTS public.club_trophies (
 );
 
 -- ==============================================================================
--- 17. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
+-- 17. TABLA: membership_applications (Solicitudes Públicas de Admisión & Afiliación)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.membership_applications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    applicant_name TEXT NOT NULL,
+    applicant_lastname TEXT NOT NULL,
+    doc_type TEXT NOT NULL DEFAULT 'TI' CHECK (doc_type IN ('CC', 'TI', 'RC', 'CE', 'Pasaporte')),
+    doc_number TEXT NOT NULL,
+    birth_date DATE,
+    age INTEGER,
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    municipality TEXT NOT NULL DEFAULT 'Sabaneta',
+    desired_category TEXT NOT NULL DEFAULT 'Iniciación Infantil (4 a 8 años)',
+    approximate_elo INTEGER DEFAULT 0,
+    guardian_name TEXT,
+    guardian_phone TEXT,
+    health_provider TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'approved', 'rejected')),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 18. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
@@ -325,6 +349,7 @@ ALTER TABLE public.club_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_trophies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.membership_applications ENABLE ROW LEVEL SECURITY;
 
 
 -- ==============================================================================
@@ -437,6 +462,13 @@ CREATE POLICY "Trofeos lectura publica" ON public.club_trophies FOR SELECT USING
 DROP POLICY IF EXISTS "Admins gestionan trofeos" ON public.club_trophies;
 CREATE POLICY "Admins gestionan trofeos" ON public.club_trophies FOR ALL USING (public.is_admin());
 
+-- Membership Applications (Solicitudes Públicas de Admisión & Afiliación)
+DROP POLICY IF EXISTS "Solicitudes insercion publica" ON public.membership_applications;
+CREATE POLICY "Solicitudes insercion publica" ON public.membership_applications FOR INSERT WITH CHECK (TRUE);
+
+DROP POLICY IF EXISTS "Admins gestionan solicitudes" ON public.membership_applications;
+CREATE POLICY "Admins gestionan solicitudes" ON public.membership_applications FOR ALL USING (public.is_admin());
+
 -- ==============================================================================
 -- 18. SEED DATA (DATOS INICIALES COMPLETOS)
 -- ==============================================================================
@@ -502,5 +534,14 @@ VALUES
 ('Copa Interclubes del Sur del Valle de Aburrá', 2024, 'Torneo por Equipos Mayores', 'Equipo Capablanca Sabaneta Élite', 'Club de Ajedrez Envigado', 'team_medal', 'Copa Confraternidad 2024', 'Sede CC Aves María', 'Victoria por equipos 3.5 a 0.5 en la ronda final decisiva.'),
 ('Torneo Juvenil San Juan Bautista de Sabaneta', 2023, 'Juvenil Sub-16', 'Santiago Gómez', 'Mateo Valencia', 'champion', 'Edición Tradicional 2023', 'Parque Principal de Sabaneta', 'Torneo al aire libre con más de 48 deportistas del municipio.')
 ON CONFLICT DO NOTHING;
+
+-- Solicitudes Iniciales de Afiliación
+INSERT INTO public.membership_applications (applicant_name, applicant_lastname, doc_type, doc_number, birth_date, age, email, phone, municipality, desired_category, approximate_elo, guardian_name, guardian_phone, health_provider, status, notes)
+VALUES
+('Juan Pablo', 'Gutiérrez Morales', 'TI', '1036987412', '2012-05-14', 14, 'familia.gutierrez@gmail.com', '+57 311 456 7890', 'Sabaneta', 'Semillero Sub-12', 1250, 'Diana Morales (Madre)', '+57 311 456 7890', 'Sura EPS', 'pending', 'Interesado en incorporarse a los entrenamientos de los miércoles y viernes.'),
+('Camila', 'Vargas Echeverri', 'TI', '1040582910', '2015-09-22', 10, 'carlos.vargas@gmail.com', '+57 301 987 6543', 'Envigado', 'Iniciación Infantil (4 a 8 años)', 0, 'Carlos Vargas (Padre)', '+57 301 987 6543', 'Sanitas', 'contacted', 'Contactada vía WhatsApp para clase diagnóstica de inducción.'),
+('Rodrigo', 'Henao Restrepo', 'CC', '71239845', '1988-03-10', 38, 'rodrigo.henao@outlook.com', '+57 315 678 1234', 'Sabaneta', 'Adultos & Aficionados', 1620, NULL, NULL, 'Nueva EPS', 'approved', 'Afiliación aprobada. Incorporado a entrenamientos sabatinos.')
+ON CONFLICT DO NOTHING;
+
 
 

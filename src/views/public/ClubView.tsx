@@ -407,7 +407,10 @@ export const ClubView: React.FC = () => {
             Visítanos en nuestra sede en el tercer piso del CC Aves María en Sabaneta o comunícate directamente con nuestro equipo directivo.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-            <Link to="/contacto" className="btn btn--primary">
+            <Link to="/afiliarse" className="btn btn--primary">
+              Solicitar Afiliación Deportiva
+            </Link>
+            <Link to="/contacto" className="btn btn--secondary">
               Contactar al Club
             </Link>
             <Link to="/afiliados" className="btn btn--ghost">

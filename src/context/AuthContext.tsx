@@ -35,10 +35,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedMock && mounted) {
           try {
             setUser(JSON.parse(storedMock));
+            setLoading(false);
+            return;
           } catch {
             setUser(null);
           }
         }
+
+        // Si se accede directamente por el puerto 5181 (Admin) o ruta /admin en modo local, auto-iniciar con MOCK_ADMIN_PROFILE
+        const isPort5181 = window.location.port === '5181';
+        const isAdminPath = window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login';
+        if ((isPort5181 || isAdminPath) && mounted) {
+          setUser(MOCK_ADMIN_PROFILE);
+          localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_ADMIN_PROFILE));
+          setLoading(false);
+          return;
+        }
+
+        // Si se accede directamente por el puerto 5182 (Afiliados) o ruta /afiliados en modo local, auto-iniciar con MOCK_MEMBER_PROFILE
+        const isPort5182 = window.location.port === '5182';
+        const isMembersPath = window.location.pathname.startsWith('/afiliados');
+        if ((isPort5182 || isMembersPath) && mounted) {
+          setUser(MOCK_MEMBER_PROFILE);
+          localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_MEMBER_PROFILE));
+          setLoading(false);
+          return;
+        }
+
         setLoading(false);
         return;
       }

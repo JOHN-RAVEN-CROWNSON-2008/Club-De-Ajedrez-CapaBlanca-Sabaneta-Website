@@ -18,6 +18,9 @@ export interface UserProfile {
   fecha_nacimiento?: string;
   ciudad?: string;
   telefono?: string;
+  doc_type?: string;
+  doc_number?: string;
+  municipio?: string;
   role: UserRole;
   categoria_ajedrez?: string;
   fide_id?: string;
@@ -201,6 +204,31 @@ export interface ClubTrophy {
   notes?: string;
   created_at?: string;
 }
+
+export type ApplicationStatus = 'pending' | 'contacted' | 'approved' | 'rejected';
+export type DocType = 'CC' | 'TI' | 'RC' | 'CE' | 'Pasaporte';
+
+export interface MembershipApplication {
+  id: string;
+  applicant_name: string;
+  applicant_lastname: string;
+  doc_type: DocType;
+  doc_number: string;
+  birth_date?: string;
+  age?: number;
+  email: string;
+  phone: string;
+  municipality: string;
+  desired_category: string;
+  approximate_elo?: number;
+  guardian_name?: string;
+  guardian_phone?: string;
+  health_provider?: string;
+  status: ApplicationStatus;
+  notes?: string;
+  created_at: string;
+}
+
 
 
 

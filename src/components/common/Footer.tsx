@@ -38,6 +38,7 @@ export const Footer: React.FC = () => {
             <li><Link to="/blog">Noticias y Blog</Link></li>
             <li><Link to="/galeria">Galería Fotográfica</Link></li>
             <li><Link to="/afiliados">Zona de Afiliados</Link></li>
+            <li><Link to="/afiliarse" style={{ color: '#4ade80', fontWeight: 600 }}>Solicitud de Afiliación</Link></li>
             <li><Link to="/reloj">Reloj de Ajedrez Oficial</Link></li>
             <li><Link to="/verificar" style={{ color: 'var(--gold)', fontWeight: 600 }}>Validar Certificado</Link></li>
           </ul>

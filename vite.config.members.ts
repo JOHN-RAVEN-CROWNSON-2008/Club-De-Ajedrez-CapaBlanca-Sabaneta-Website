@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 // Puerto 5182: Portal de Afiliados y Alumnos del Club
 export default defineConfig({
   plugins: [react()],
+  cacheDir: 'node_modules/.vite_members',
   define: {
     '__APP_TARGET_PORT__': 5182,
     '__APP_DEFAULT_ROUTE__': '"/afiliados"',
