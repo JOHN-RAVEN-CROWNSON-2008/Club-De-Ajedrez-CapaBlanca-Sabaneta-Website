@@ -5,6 +5,7 @@ import { INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
 import { ClubEvent, TournamentMatch } from '../../types/database';
 import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
+import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
 export const TournamentsView: React.FC = () => {
@@ -15,6 +16,7 @@ export const TournamentsView: React.FC = () => {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings'>>({});
   const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
+  const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -366,6 +368,7 @@ export const TournamentsView: React.FC = () => {
                                             <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>PP</th>
                                             <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>SB</th>
                                             <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right', color: 'var(--gold)' }}>PTS</th>
+                                            <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>Diploma</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -396,6 +399,41 @@ export const TournamentsView: React.FC = () => {
                                               <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', color: '#888' }}>{st.sonnebornBerger}</td>
                                               <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--gold)', fontSize: '0.85rem' }}>
                                                 {st.points}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setTournamentCertModalData({
+                                                    athleteName: st.name,
+                                                    tournamentTitle: evt.title,
+                                                    eventDate: evt.event_date,
+                                                    location: evt.location,
+                                                    rhythm: evt.rhythm,
+                                                    rank: st.rank,
+                                                    points: st.points,
+                                                    sonnebornBerger: st.sonnebornBerger,
+                                                    played: st.played,
+                                                    won: st.won,
+                                                    isChampion: st.rank === 1,
+                                                  })}
+                                                  style={{
+                                                    background: '#222',
+                                                    color: 'var(--gold)',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '4px',
+                                                    padding: '0.15rem 0.4rem',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.2rem',
+                                                  }}
+                                                  title="Ver e Imprimir Diploma Oficial"
+                                                >
+                                                  <Award size={11} />
+                                                  <span>Diploma</span>
+                                                </button>
                                               </td>
                                             </tr>
                                           ))}
@@ -463,6 +501,15 @@ export const TournamentsView: React.FC = () => {
           blackPlayer={activePgnMatch.black_player}
           result={activePgnMatch.result}
           pgn={activePgnMatch.pgn || ''}
+        />
+      )}
+
+      {/* Modal Diploma Oficial de Torneo */}
+      {tournamentCertModalData && (
+        <TournamentCertificateModal
+          isOpen={true}
+          onClose={() => setTournamentCertModalData(null)}
+          data={tournamentCertModalData}
         />
       )}
     </div>

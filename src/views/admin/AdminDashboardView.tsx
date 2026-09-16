@@ -24,6 +24,8 @@ import {
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { DigitalAthleteIdCardModal } from '../../components/common/DigitalAthleteIdCardModal';
+import { DatabaseDiagnosticModal } from '../../components/common/DatabaseDiagnosticModal';
+import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { whatsappService } from '../../services/whatsappService';
 import { AdminLoginView } from '../auth/AdminLoginView';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
@@ -146,6 +148,8 @@ export const AdminDashboardView: React.FC = () => {
   const [cardMember, setCardMember] = useState<UserProfile | null>(null);
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [showDbDiagnosticModal, setShowDbDiagnosticModal] = useState(false);
+  const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
 
   // Validar permisos
   useEffect(() => {
@@ -1254,6 +1258,15 @@ export const AdminDashboardView: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setShowDbDiagnosticModal(true)}
+                    className="btn btn--ghost btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'var(--gold)', color: 'var(--gold)' }}
+                  >
+                    <ShieldCheck size={15} />
+                    <span>Diagnóstico de Base de Datos (15 Tablas)</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowSqlModal(true)}
                     className="btn btn--ghost btn--sm"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
@@ -1920,6 +1933,7 @@ export const AdminDashboardView: React.FC = () => {
                                   <th style={{ padding: '0.8rem 0.6rem', textAlign: 'center' }}>PP</th>
                                   <th style={{ padding: '0.8rem 0.8rem', textAlign: 'center' }}>Desempate (SB)</th>
                                   <th style={{ padding: '0.8rem 1rem', textAlign: 'right', color: 'var(--gold)' }}>Puntos Totales</th>
+                                  <th style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>Acción</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1969,6 +1983,40 @@ export const AdminDashboardView: React.FC = () => {
                                     </td>
                                     <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontWeight: 900, color: 'var(--gold)', fontSize: '1.05rem' }}>
                                       {st.points}
+                                    </td>
+                                    <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setTournamentCertModalData({
+                                          athleteName: st.name,
+                                          tournamentTitle: targetEvent?.title || 'Torneo Capablanca',
+                                          eventDate: targetEvent?.event_date || '2026',
+                                          location: targetEvent?.location,
+                                          rhythm: targetEvent?.rhythm,
+                                          rank: st.rank,
+                                          points: st.points,
+                                          sonnebornBerger: st.sonnebornBerger,
+                                          played: st.played,
+                                          won: st.won,
+                                          isChampion: st.rank === 1,
+                                        })}
+                                        className="btn btn--sm"
+                                        style={{
+                                          background: '#231d10',
+                                          color: 'var(--gold)',
+                                          border: '1px solid #7c621d',
+                                          padding: '0.25rem 0.6rem',
+                                          fontSize: '0.72rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem',
+                                          cursor: 'pointer',
+                                        }}
+                                        title="Emitir Diploma / Certificado de Torneo"
+                                      >
+                                        <Award size={13} />
+                                        <span>Diploma</span>
+                                      </button>
                                     </td>
                                   </tr>
                                 ))}
@@ -3758,6 +3806,40 @@ export const AdminDashboardView: React.FC = () => {
           member={cardMember}
         />
       )}
+
+      {/* Modal Diploma / Certificado Oficial de Torneo */}
+      {tournamentCertModalData && (
+        <TournamentCertificateModal
+          isOpen={true}
+          onClose={() => setTournamentCertModalData(null)}
+          data={tournamentCertModalData}
+        />
+      )}
+
+      {/* Modal de Auditoría & Diagnóstico de Base de Datos */}
+      <DatabaseDiagnosticModal
+        isOpen={showDbDiagnosticModal}
+        onClose={() => setShowDbDiagnosticModal(false)}
+        tableCounts={{
+          profiles: members.length,
+          membership_applications: applications.length,
+          events: events.length,
+          tournament_matches: matches.length,
+          tournament_registrations: registrations.length,
+          club_trophies: trophies.length,
+          posts: posts.length,
+          documents: documents.length,
+          gallery: gallery.length,
+          membership_payments: payments.length,
+          class_schedules: schedules.length,
+          class_attendance: attendance.length,
+          club_announcements: announcements.length,
+          contact_messages: messages.length,
+          site_settings: 1,
+        }}
+        onExportBackup={handleExportFullJsonBackup}
+        onNotice={triggerNotice}
+      />
 
       {/* Modal Esquema SQL Supabase */}
       {showSqlModal && (
