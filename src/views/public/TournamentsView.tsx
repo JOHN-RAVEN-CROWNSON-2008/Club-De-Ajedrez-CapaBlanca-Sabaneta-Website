@@ -83,8 +83,8 @@ export const TournamentsView: React.FC = () => {
       <section className="section" style={{ background: '#0e0e0e', color: '#fff', minHeight: '60vh' }}>
         <div className="wrap">
           
-          {/* Botones de filtro */}
-          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+          {/* Botones de filtro y Acceso a Reloj Digital */}
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '2.5rem', alignItems: 'center' }}>
             <button
               type="button"
               className={`btn btn--sm ${filter === 'all' ? 'btn--primary' : 'btn--ghost'}`}
@@ -106,6 +106,27 @@ export const TournamentsView: React.FC = () => {
             >
               Semilleros Infantiles
             </button>
+
+            <Link
+              to="/reloj"
+              className="btn btn--sm"
+              style={{
+                marginLeft: 'auto',
+                background: 'linear-gradient(135deg, var(--gold), #e0a820)',
+                color: '#0a0a0a',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                padding: '0.5rem 1rem',
+                boxShadow: '0 4px 12px rgba(212,175,55,0.25)'
+              }}
+            >
+              <Clock size={16} />
+              <span>Abrir Reloj Oficial</span>
+            </Link>
           </div>
 
           {loading ? (
