@@ -244,9 +244,17 @@ export const AffiliationCertificateModal: React.FC<AffiliationCertificateModalPr
           </div>
 
           {/* Fecha de Expedición y Código */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #e0d8c7', paddingBottom: '0.8rem', marginBottom: '2.5rem' }}>
-            <span>Expedido en Sabaneta, Antioquia a los <strong>{issueDate}</strong></span>
-            <span>Código de Verificación: <strong style={{ color: '#111', fontFamily: 'monospace' }}>{certCode}</strong></span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #e0d8c7', paddingBottom: '0.8rem', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <span>Expedido en Sabaneta, Antioquia a los <strong>{issueDate}</strong></span>
+              <div style={{ fontSize: '0.72rem', color: '#777', marginTop: '0.2rem' }}>
+                Validar autenticidad en: <a href={`/verificar?codigo=${certCode}`} target="_blank" rel="noopener noreferrer" style={{ color: '#8c7038', textDecoration: 'underline', fontWeight: 600 }}>clubcapablanca.org/verificar?codigo={certCode}</a>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#777' }}>Código de Verificación:</span>
+              <strong style={{ color: '#111', fontFamily: 'monospace', fontSize: '0.95rem' }}>{certCode}</strong>
+            </div>
           </div>
 
           {/* Firmas y Sellos */}

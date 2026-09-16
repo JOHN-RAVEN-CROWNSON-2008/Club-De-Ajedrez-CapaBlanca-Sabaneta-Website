@@ -13,6 +13,7 @@ import { BlogView } from './views/public/BlogView';
 import { BlogPostView } from './views/public/BlogPostView';
 import { GalleryView } from './views/public/GalleryView';
 import { ContactView } from './views/public/ContactView';
+import { VerifyCertificateView } from './views/public/VerifyCertificateView';
 
 // Auth views
 import { MemberLoginView } from './views/auth/MemberLoginView';
@@ -77,6 +78,7 @@ export const App: React.FC = () => {
             <Route path="/blog/:slug" element={<PublicLayout><BlogPostView /></PublicLayout>} />
             <Route path="/galeria" element={<PublicLayout><GalleryView /></PublicLayout>} />
             <Route path="/contacto" element={<PublicLayout><ContactView /></PublicLayout>} />
+            <Route path="/verificar" element={<PublicLayout><VerifyCertificateView /></PublicLayout>} />
 
             {/* Rutas de Autenticación */}
             <Route path="/login-afiliado" element={<PublicLayout><MemberLoginView /></PublicLayout>} />
