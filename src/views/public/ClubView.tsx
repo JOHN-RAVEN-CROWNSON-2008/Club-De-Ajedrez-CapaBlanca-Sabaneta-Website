@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown } from 'lucide-react';
+import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown, Search, ShieldCheck } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_MEMBERS, INITIAL_TROPHIES } from '../../lib/initialData';
 import { UserProfile, ClubTrophy } from '../../types/database';
@@ -9,6 +9,7 @@ export const ClubView: React.FC = () => {
   const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
   const [trophies, setTrophies] = useState<ClubTrophy[]>(INITIAL_TROPHIES);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [rankingSearch, setRankingSearch] = useState<string>('');
   const [trophyYearFilter, setTrophyYearFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -143,8 +144,59 @@ export const ClubView: React.FC = () => {
               Ranking interno del Club de Ajedrez Capablanca Sabaneta ordenado por Elo oficial y rendimiento competitivo
             </p>
 
+            {/* Barra de Búsqueda del Escalafón */}
+            <div style={{ maxWidth: '520px', margin: '1.5rem auto 1.2rem', position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+              <input
+                type="text"
+                placeholder="Buscar por nombre, usuario, ciudad o FIDE ID..."
+                value={rankingSearch}
+                onChange={(e) => setRankingSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 2.8rem 0.75rem 2.8rem',
+                  borderRadius: '30px',
+                  background: '#161616',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--gold)';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(245, 197, 24, 0.25)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#333';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+              {rankingSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRankingSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#888',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                  }}
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             {/* Filtros de Categoría */}
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
               {['all', 'Infantil', 'Juvenil', 'Adultos', 'Maestros'].map((cat) => (
                 <button
                   key={cat}
@@ -193,13 +245,22 @@ export const ClubView: React.FC = () => {
                       if (categoryFilter === 'Maestros') return (m.categoria_ajedrez || '').toLowerCase().includes('maestro') || (m.elo_rating || 0) >= 2000;
                       return true;
                     })
+                    .filter((m) => {
+                      if (!rankingSearch.trim()) return true;
+                      const q = rankingSearch.toLowerCase();
+                      const fullName = `${m.nombre || ''} ${m.apellido || ''}`.toLowerCase();
+                      const username = (m.usuario || '').toLowerCase();
+                      const city = (m.ciudad || '').toLowerCase();
+                      const fide = (m.fide_id || '').toLowerCase();
+                      return fullName.includes(q) || username.includes(q) || city.includes(q) || fide.includes(q);
+                    })
                     .sort((a, b) => (b.elo_rating || 0) - (a.elo_rating || 0));
 
                   if (sorted.length === 0) {
                     return (
                       <tr>
                         <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#777' }}>
-                          No hay deportistas listados en esta categoría actualmente.
+                          No se encontraron deportistas con el criterio seleccionado.
                         </td>
                       </tr>
                     );
@@ -255,9 +316,35 @@ export const ClubView: React.FC = () => {
                           )}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <span style={{ color: '#81c784', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                            Activo ✓
-                          </span>
+                          <Link
+                            to={`/verificar?codigo=CAPA-${(player.id || 'MEM').slice(-6).toUpperCase()}-2026`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: '20px',
+                              background: 'rgba(76, 175, 80, 0.12)',
+                              border: '1px solid rgba(76, 175, 80, 0.35)',
+                              color: '#81c784',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                              transition: 'all 0.2s ease',
+                            }}
+                            title={`Validar certificación deportiva oficial de ${player.nombre} ${player.apellido}`}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(76, 175, 80, 0.25)';
+                              e.currentTarget.style.borderColor = '#81c784';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(76, 175, 80, 0.12)';
+                              e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.35)';
+                            }}
+                          >
+                            <ShieldCheck size={14} />
+                            <span>Activo ✓</span>
+                          </Link>
                         </td>
                       </tr>
                     );
