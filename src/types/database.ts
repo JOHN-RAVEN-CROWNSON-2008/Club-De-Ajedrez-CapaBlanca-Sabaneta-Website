@@ -98,7 +98,7 @@ export interface ClubDocument {
 export interface TournamentRegistration {
   id: string;
   event_id: string;
-  user_id: string;
+  user_id?: string;
   notes?: string;
   status: RegistrationStatus;
   created_at: string;

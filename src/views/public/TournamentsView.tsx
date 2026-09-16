@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
-import { ClubEvent, TournamentMatch } from '../../types/database';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal, UserCheck } from 'lucide-react';
+import { INITIAL_EVENTS, INITIAL_MATCHES, INITIAL_REGISTRATIONS } from '../../lib/initialData';
+import { ClubEvent, TournamentMatch, TournamentRegistration } from '../../types/database';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal, UserCheck, Users } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { TournamentRegistrationModal } from '../../components/common/TournamentRegistrationModal';
@@ -12,10 +12,11 @@ import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/to
 export const TournamentsView: React.FC = () => {
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
+  const [registrations, setRegistrations] = useState<TournamentRegistration[]>(INITIAL_REGISTRATIONS);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
-  const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings'>>({});
+  const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings' | 'roster'>>({});
   const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
   const [registeringEvent, setRegisteringEvent] = useState<ClubEvent | null>(null);
@@ -51,10 +52,22 @@ export const TournamentsView: React.FC = () => {
         } else {
           setMatches(INITIAL_MATCHES);
         }
+
+        const { data: regs } = await supabase
+          .from('tournament_registrations')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (regs && regs.length > 0) {
+          setRegistrations(regs as TournamentRegistration[]);
+        } else {
+          setRegistrations(INITIAL_REGISTRATIONS);
+        }
       } catch (err) {
         console.error('Error al cargar datos de torneos de Supabase:', err);
         setEvents(INITIAL_EVENTS);
         setMatches(INITIAL_MATCHES);
+        setRegistrations(INITIAL_REGISTRATIONS);
       } finally {
         setLoading(false);
       }
@@ -192,12 +205,38 @@ export const TournamentsView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección Desplegable de Emparejamientos & Resultados / Tabla de Posiciones */}
+                  {/* Sección Desplegable de Nómina, Emparejamientos & Clasificación */}
                   {(() => {
                     const eventMatches = matches.filter((m) => m.event_id === evt.id);
                     const eventStandings = calculateTournamentStandings(eventMatches);
+                    const eventRegs = registrations.filter((r) => r.event_id === evt.id && r.status !== 'cancelled');
+                    const parsedAthletes = eventRegs.map((r) => {
+                      let ext: any = null;
+                      try {
+                        if (r.notes && r.notes.startsWith('{')) ext = JSON.parse(r.notes);
+                      } catch {}
+                      const name = ext?.fullName || (r.profile ? `${r.profile.nombre} ${r.profile.apellido}` : 'Deportista Capablanca');
+                      const elo = Number(ext?.eloRating) || r.profile?.elo_rating || 0;
+                      const fide = ext?.fideId || r.profile?.fide_id || '';
+                      const category = ext?.category || r.profile?.categoria_ajedrez || 'Categoría Abierta';
+                      const club = ext?.clubOrCity || 'Capablanca Sabaneta';
+                      const radicado = ext?.regCode || `REG-CAPA-${r.id.slice(0, 6).toUpperCase()}-2026`;
+                      const isConfirmed = r.status === 'confirmed' || r.status === 'attended';
+                      return {
+                        id: r.id,
+                        name,
+                        elo,
+                        fide,
+                        category,
+                        club,
+                        radicado,
+                        isConfirmed,
+                        status: r.status,
+                      };
+                    }).sort((a, b) => (b.elo || 0) - (a.elo || 0));
+
                     const isExpanded = expandedEventId === evt.id;
-                    const activeTab = tournamentTab[evt.id] || 'matches';
+                    const activeTab = tournamentTab[evt.id] || (eventMatches.length > 0 ? 'matches' : 'roster');
 
                     return (
                       <div style={{ marginTop: '1.2rem', borderTop: '1px solid #252525', paddingTop: '1rem' }}>
@@ -220,15 +259,36 @@ export const TournamentsView: React.FC = () => {
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <Swords size={16} />
-                            Emparejamientos ({eventMatches.length}) & Posiciones ({eventStandings.length})
+                            Nómina ({eventRegs.length}), Partidas ({eventMatches.length}) & Posiciones ({eventStandings.length})
                           </span>
                           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
 
                         {isExpanded && (
                           <div style={{ marginTop: '0.8rem' }}>
-                            {/* Pestañas: Emparejamientos vs Tabla de Posiciones */}
-                            <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem', marginBottom: '0.8rem' }}>
+                            {/* Pestañas: Nómina vs Emparejamientos vs Tabla de Posiciones */}
+                            <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => setTournamentTab({ ...tournamentTab, [evt.id]: 'roster' })}
+                                style={{
+                                  background: activeTab === 'roster' ? '#252525' : 'transparent',
+                                  color: activeTab === 'roster' ? 'var(--gold)' : '#888',
+                                  border: '1px solid',
+                                  borderColor: activeTab === 'roster' ? 'var(--gold)' : '#333',
+                                  borderRadius: '6px',
+                                  padding: '0.25rem 0.65rem',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}
+                              >
+                                <Users size={13} />
+                                <span>Nómina ({eventRegs.length})</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setTournamentTab({ ...tournamentTab, [evt.id]: 'matches' })}
@@ -272,6 +332,63 @@ export const TournamentsView: React.FC = () => {
                                 <span>Tabla de Posiciones ({eventStandings.length})</span>
                               </button>
                             </div>
+
+                            {/* Contenido: Nómina Oficial */}
+                            {activeTab === 'roster' && (
+                              <div style={{ background: '#181818', border: '1px solid #282828', borderRadius: '8px', overflowX: 'auto' }}>
+                                {parsedAthletes.length === 0 ? (
+                                  <div style={{ padding: '1.2rem', textAlign: 'center', color: '#777', fontSize: '0.82rem' }}>
+                                    No hay deportistas preinscritos aún para este certamen. ¡Sé el primero en preinscribirte!
+                                  </div>
+                                ) : (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.78rem' }}>
+                                    <thead>
+                                      <tr style={{ background: '#202020', borderBottom: '1px solid #333', color: '#888', textTransform: 'uppercase', fontSize: '0.68rem' }}>
+                                        <th style={{ padding: '0.5rem 0.8rem', width: '35px' }}>#</th>
+                                        <th style={{ padding: '0.5rem 0.8rem' }}>Deportista</th>
+                                        <th style={{ padding: '0.5rem 0.8rem' }}>Elo / FIDE</th>
+                                        <th style={{ padding: '0.5rem 0.8rem' }}>Procedencia</th>
+                                        <th style={{ padding: '0.5rem 0.8rem', textAlign: 'right' }}>Acreditación</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {parsedAthletes.map((ath, idx) => (
+                                        <tr key={ath.id} style={{ borderBottom: '1px solid #222' }}>
+                                          <td style={{ padding: '0.5rem 0.8rem', color: '#666', fontWeight: 700 }}>
+                                            {idx + 1}
+                                          </td>
+                                          <td style={{ padding: '0.5rem 0.8rem' }}>
+                                            <div style={{ fontWeight: 600, color: '#fff' }}>{ath.name}</div>
+                                            <div style={{ fontSize: '0.68rem', color: 'var(--gold)' }}>{ath.radicado}</div>
+                                          </td>
+                                          <td style={{ padding: '0.5rem 0.8rem' }}>
+                                            <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{ath.elo > 0 ? ath.elo : 'S/E'}</span>
+                                            {ath.fide && <span style={{ color: '#888', marginLeft: '0.3rem' }}>· FIDE: {ath.fide}</span>}
+                                          </td>
+                                          <td style={{ padding: '0.5rem 0.8rem', color: '#aaa' }}>
+                                            {ath.club}
+                                          </td>
+                                          <td style={{ padding: '0.5rem 0.8rem', textAlign: 'right' }}>
+                                            <span style={{
+                                              padding: '0.15rem 0.45rem',
+                                              borderRadius: '4px',
+                                              fontSize: '0.65rem',
+                                              fontWeight: 700,
+                                              textTransform: 'uppercase',
+                                              background: ath.isConfirmed ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                                              color: ath.isConfirmed ? '#4ade80' : '#fbbf24',
+                                              border: `1px solid ${ath.isConfirmed ? '#15803d' : '#b45309'}`,
+                                            }}>
+                                              {ath.status === 'attended' ? 'En Sala' : ath.status === 'confirmed' ? 'Confirmado' : 'Preinscrito'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            )}
 
                             {/* Contenido: Emparejamientos */}
                             {activeTab === 'matches' && (
@@ -522,6 +639,18 @@ export const TournamentsView: React.FC = () => {
           isOpen={true}
           onClose={() => setRegisteringEvent(null)}
           event={registeringEvent}
+          onRegisteredSuccess={(regData) => {
+            const newReg: TournamentRegistration = {
+              id: crypto.randomUUID(),
+              event_id: registeringEvent.id,
+              status: 'pending',
+              notes: JSON.stringify(regData),
+              created_at: new Date().toISOString(),
+            };
+            setRegistrations((prev) => [newReg, ...prev]);
+            setTournamentTab((prev) => ({ ...prev, [registeringEvent.id]: 'roster' }));
+            setExpandedEventId(registeringEvent.id);
+          }}
         />
       )}
     </div>
