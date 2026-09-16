@@ -4,7 +4,7 @@ export type UserRole = 'admin' | 'member' | 'student';
 export type UserStatus = 'active' | 'inactive' | 'pending';
 export type EventStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
 export type DocumentCategory = 'General' | 'Reglamento' | 'Material de Estudio' | 'Partidas PGN' | 'Circulares';
-export type RegistrationStatus = 'confirmed' | 'waitlist' | 'cancelled';
+export type RegistrationStatus = 'confirmed' | 'pending' | 'waitlist' | 'attended' | 'cancelled';
 export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentMethod = 'Nequi' | 'Daviplata' | 'Bancolombia' | 'Efectivo' | 'Otro';
 

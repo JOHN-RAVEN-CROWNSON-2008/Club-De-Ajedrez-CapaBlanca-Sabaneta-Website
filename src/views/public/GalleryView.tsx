@@ -1,9 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_GALLERY } from '../../lib/initialData';
-import { Image, ZoomIn, X } from 'lucide-react';
+import { GalleryItem } from '../../types/database';
+import { Image, ZoomIn, X, Filter } from 'lucide-react';
 
 export const GalleryView: React.FC = () => {
-  const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string; caption: string } | null>(null);
+  const [gallery, setGallery] = useState<GalleryItem[]>(INITIAL_GALLERY);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadGallery() {
+      if (!isSupabaseConfigured()) {
+        setGallery(INITIAL_GALLERY);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('gallery')
+          .select('*')
+          .order('order_index', { ascending: true });
+
+        if (data && data.length > 0) {
+          setGallery(data as GalleryItem[]);
+        } else {
+          setGallery(INITIAL_GALLERY);
+        }
+      } catch (err) {
+        console.error('Error al cargar galería de Supabase:', err);
+        setGallery(INITIAL_GALLERY);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadGallery();
+  }, []);
+
+  const categories = ['all', 'infantil', 'torneos', 'adultos', 'delegacion', 'sede', 'comunidad'];
+
+  const filteredGallery = gallery.filter((item) => {
+    if (selectedCategory === 'all') return true;
+    return item.category?.toLowerCase() === selectedCategory.toLowerCase();
+  });
 
   return (
     <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
@@ -23,8 +65,33 @@ export const GalleryView: React.FC = () => {
       {/* Grid fotográfico */}
       <section className="section" style={{ background: '#0a0a0a', color: '#fff', minHeight: '60vh' }}>
         <div className="wrap">
+          {/* Barra de Filtros por Categoría */}
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '2.5rem', justifyContent: 'center' }}>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  textTransform: 'capitalize',
+                  border: selectedCategory === cat ? '1px solid var(--gold)' : '1px solid #333',
+                  background: selectedCategory === cat ? 'var(--gold)' : '#141414',
+                  color: selectedCategory === cat ? '#000' : '#bbb',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {cat === 'all' ? 'Todas las Fotos' : cat}
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            {INITIAL_GALLERY.map((item) => (
+            {filteredGallery.map((item) => (
               <div
                 key={item.id}
                 onClick={() => setSelectedImage(item)}

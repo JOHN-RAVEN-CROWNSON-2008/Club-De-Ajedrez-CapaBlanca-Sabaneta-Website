@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS public.tournament_registrations (
     event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     notes TEXT,
-    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'waitlist', 'cancelled')),
+    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'pending', 'waitlist', 'attended', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     UNIQUE(event_id, user_id)
 );

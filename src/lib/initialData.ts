@@ -1,4 +1,7 @@
-import { SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile, MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch } from '../types/database';
+import {
+  SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
+  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration
+} from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
   id: 'general',
@@ -278,4 +281,136 @@ export const INITIAL_MATCHES: TournamentMatch[] = [
     pgn: '1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Be7 5. Bg5 O-O 6. e3 h6 7. Bh4 b6 8. cxd5 Nxd5 9. Bxe7 Qxe7 10. Nxd5 exd5 11. Rc1 Be6 12. Qa4 c5 13. Qa3 Rc8 14. Be2 Nd7 15. O-O Kf8 16. Ba6 Rc7 17. Rc3 c4 18. Qxe7+ Kxe7 19. b3 Nb8 20. Bb5 a6 21. Ba4 b5 22. bxc4 bxa4 23. c5 Nc6 24. Ra3 Rb8 25. Rxa4 a5 26. Ra3 Rb2 27. h3 Rcb7 28. Rc1 Rb1 29. Rxb1 Rxb1+ 30. Kh2 Rb2 31. Kg3 f6 32. Ne1 Bf5 33. Nd3 Bxd3 34. Rxd3 Rxa2 35. Rb3 Nb4 36. f3 Kd7 37. e4 Kc6 38. exd5+ Kxd5 39. Re3 Kxd4 40. Re7 g5 41. Re6 Kxc5 42. Rxf6 a4 43. Rxh6 a3 44. Rg6 Kb5 45. Rxg5+ Ka4 46. Rg8 Rd2 47. Ra8+ Kb3 48. h4 a2 49. h5 Rd4 50. Rxa2 Kxa2 51. f4 Kb3 52. h6 Rd6 53. Kg4 Rxh6 54. Kg5 Rh8 55. g4 Kc4 56. f5 Kd5 57. Kf6 Kd6 58. g5 Nd5+ 59. Kg7 Rh1 60. f6 Rg1 61. g6 Nf4 62. f7 Rxg6+ 63. Kh7 Rf6 64. Kg7 Ke7 65. f8=Q+ Rxf8 1/2-1/2',
   }
 ];
+
+export const INITIAL_REGISTRATIONS: TournamentRegistration[] = [
+  {
+    id: 'reg-1',
+    event_id: 'ev-1',
+    user_id: 'usr-member-01',
+    status: 'confirmed',
+    notes: 'Pago mensualidad al día',
+    created_at: '2026-09-10T14:20:00Z',
+    profile: MOCK_MEMBER_PROFILE,
+  },
+  {
+    id: 'reg-2',
+    event_id: 'ev-1',
+    user_id: 'usr-member-02',
+    status: 'confirmed',
+    notes: 'Confirmado por transferencia',
+    created_at: '2026-09-11T11:00:00Z',
+    profile: {
+      id: 'usr-member-02',
+      nombre: 'Andrés',
+      apellido: 'Arboleda',
+      usuario: 'andres_arboleda',
+      correo: 'andres.arboleda@gmail.com',
+      telefono: '+57 310 445 9901',
+      ciudad: 'Sabaneta',
+      role: 'student',
+      categoria_ajedrez: 'Juvenil Sub-16',
+      elo_rating: 1520,
+      fide_id: '4452205',
+      estado: 'active',
+      created_at: '2025-03-01T00:00:00Z',
+    }
+  },
+  {
+    id: 'reg-3',
+    event_id: 'ev-1',
+    user_id: 'usr-member-03',
+    status: 'confirmed',
+    notes: 'Inscripción semillero club',
+    created_at: '2026-09-12T09:30:00Z',
+    profile: {
+      id: 'usr-member-03',
+      nombre: 'Mateo',
+      apellido: 'Valencia',
+      usuario: 'mateo_valencia',
+      correo: 'mateo.valencia@ajedrez.com',
+      telefono: '+57 301 789 1234',
+      ciudad: 'Envigado',
+      role: 'student',
+      categoria_ajedrez: 'Sub-18',
+      elo_rating: 1640,
+      fide_id: '4452310',
+      estado: 'active',
+      created_at: '2025-01-15T00:00:00Z',
+    }
+  },
+  {
+    id: 'reg-4',
+    event_id: 'ev-2',
+    user_id: 'usr-member-04',
+    status: 'pending',
+    notes: 'Pendiente confirmación categoría',
+    created_at: '2026-09-13T16:45:00Z',
+    profile: {
+      id: 'usr-member-04',
+      nombre: 'Valentina',
+      apellido: 'Restrepo',
+      usuario: 'valentina_restrepo',
+      correo: 'valentina.restrepo@ajedrez.com',
+      telefono: '+57 311 234 5678',
+      ciudad: 'Sabaneta',
+      role: 'student',
+      categoria_ajedrez: 'Semillero Sub-12',
+      elo_rating: 1390,
+      fide_id: '4452420',
+      estado: 'active',
+      created_at: '2025-04-10T00:00:00Z',
+    }
+  }
+];
+
+export const INITIAL_MEMBERS: UserProfile[] = [
+  MOCK_ADMIN_PROFILE,
+  MOCK_MEMBER_PROFILE,
+  {
+    id: 'usr-member-02',
+    nombre: 'Andrés',
+    apellido: 'Arboleda',
+    usuario: 'andres_arboleda',
+    correo: 'andres.arboleda@gmail.com',
+    telefono: '+57 310 445 9901',
+    ciudad: 'Sabaneta',
+    role: 'student',
+    categoria_ajedrez: 'Juvenil Sub-16',
+    elo_rating: 1520,
+    fide_id: '4452205',
+    estado: 'active',
+    created_at: '2025-03-01T00:00:00Z',
+  },
+  {
+    id: 'usr-member-03',
+    nombre: 'Mateo',
+    apellido: 'Valencia',
+    usuario: 'mateo_valencia',
+    correo: 'mateo.valencia@ajedrez.com',
+    telefono: '+57 301 789 1234',
+    ciudad: 'Envigado',
+    role: 'student',
+    categoria_ajedrez: 'Sub-18',
+    elo_rating: 1640,
+    fide_id: '4452310',
+    estado: 'active',
+    created_at: '2025-01-15T00:00:00Z',
+  },
+  {
+    id: 'usr-member-04',
+    nombre: 'Valentina',
+    apellido: 'Restrepo',
+    usuario: 'valentina_restrepo',
+    correo: 'valentina.restrepo@ajedrez.com',
+    telefono: '+57 311 234 5678',
+    ciudad: 'Sabaneta',
+    role: 'student',
+    categoria_ajedrez: 'Semillero Sub-12',
+    elo_rating: 1390,
+    fide_id: '4452420',
+    estado: 'active',
+    created_at: '2025-04-10T00:00:00Z',
+  }
+];
+
 

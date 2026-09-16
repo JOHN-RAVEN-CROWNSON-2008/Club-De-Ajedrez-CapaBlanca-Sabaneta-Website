@@ -5,17 +5,18 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
-  INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES
+  INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
-  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch
+  MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
+  GalleryItem, TournamentRegistration
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
-  Swords, Eye
+  Swords, Eye, Camera, Award, Edit, CheckSquare
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 
@@ -24,15 +25,17 @@ export const AdminDashboardView: React.FC = () => {
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState<
-    'overview' | 'content' | 'events' | 'blog' | 'documents' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages'
+    'overview' | 'content' | 'events' | 'blog' | 'documents' | 'gallery' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages'
   >('overview');
 
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
+  const [registrations, setRegistrations] = useState<TournamentRegistration[]>(INITIAL_REGISTRATIONS);
+  const [gallery, setGallery] = useState<GalleryItem[]>(INITIAL_GALLERY);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
-  const [members, setMembers] = useState<UserProfile[]>([MOCK_ADMIN_PROFILE, MOCK_MEMBER_PROFILE]);
+  const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
   const [payments, setPayments] = useState<MembershipPayment[]>(INITIAL_PAYMENTS);
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
@@ -103,6 +106,13 @@ export const AdminDashboardView: React.FC = () => {
   });
   const [activePgnMatch, setActivePgnMatch] = useState<TournamentMatch | null>(null);
 
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [newGalleryItem, setNewGalleryItem] = useState({
+    src: '', alt: '', caption: '', category: 'torneos', order_index: 1,
+  });
+
+  const [editingMember, setEditingMember] = useState<UserProfile | null>(null);
+
   // Validar permisos
   useEffect(() => {
     if (!user) {
@@ -126,6 +136,12 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: mtchs } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
         if (mtchs && mtchs.length > 0) setMatches(mtchs as TournamentMatch[]);
+
+        const { data: gal } = await supabase.from('gallery').select('*').order('order_index', { ascending: true });
+        if (gal && gal.length > 0) setGallery(gal as GalleryItem[]);
+
+        const { data: regs } = await supabase.from('tournament_registrations').select('*').order('created_at', { ascending: false });
+        if (regs && regs.length > 0) setRegistrations(regs as TournamentRegistration[]);
 
         const { data: pst } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
         if (pst) setPosts(pst as Post[]);
@@ -319,6 +335,105 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Documento eliminado');
   };
 
+  // Galería Multimedia
+  const handleCreateGalleryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const item: GalleryItem = {
+      id: 'g-' + Date.now(),
+      src: newGalleryItem.src,
+      alt: newGalleryItem.alt || newGalleryItem.caption,
+      caption: newGalleryItem.caption,
+      category: newGalleryItem.category,
+      order_index: Number(newGalleryItem.order_index) || 1,
+      created_at: new Date().toISOString(),
+    };
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('gallery').insert(item);
+      } catch (err) {
+        console.error('Error insertando foto en Supabase:', err);
+      }
+    }
+    setGallery([item, ...gallery]);
+    setShowGalleryModal(false);
+    setNewGalleryItem({ src: '', alt: '', caption: '', category: 'torneos', order_index: 1 });
+    triggerNotice('Fotografía añadida a la galería');
+  };
+
+  const handleDeleteGalleryItem = async (id: string) => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('gallery').delete().eq('id', id);
+      } catch (err) {
+        console.error('Error eliminando foto en Supabase:', err);
+      }
+    }
+    setGallery(gallery.filter((g) => g.id !== id));
+    triggerNotice('Fotografía eliminada de la galería');
+  };
+
+  // Inscripciones a Torneo
+  const handleUpdateRegistrationStatus = async (id: string, status: 'confirmed' | 'pending' | 'attended' | 'cancelled') => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('tournament_registrations').update({ status }).eq('id', id);
+      } catch (err) {
+        console.error('Error actualizando inscripción:', err);
+      }
+    }
+    setRegistrations(registrations.map((r) => (r.id === id ? { ...r, status: status as any } : r)));
+    triggerNotice(`Inscripción marcada como ${status}`);
+  };
+
+  const handleExportRosterCSV = (eventId: string) => {
+    const ev = events.find((e) => e.id === eventId);
+    const eventRegs = registrations.filter((r) => r.event_id === eventId);
+    const headers = ['ID Registro', 'Torneo', 'Nombre Jugador', 'Correo', 'Teléfono', 'Categoría', 'Elo', 'Estado'];
+    const rows = eventRegs.map((r) => {
+      const p = r.profile || members.find((m) => m.id === r.user_id);
+      return [
+        r.id,
+        ev?.title || 'Torneo',
+        p ? `${p.nombre} ${p.apellido}` : 'Afiliado',
+        p?.correo || '',
+        p?.telefono || '',
+        p?.categoria_ajedrez || '',
+        p?.elo_rating || 0,
+        r.status,
+      ];
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((row) => row.map((f) => `"${f}"`).join(','))].join('\n');
+    const link = document.createElement('a');
+    link.href = encodeURI(csvContent);
+    link.download = `Nomina_${(ev?.title || 'Torneo').replace(/[^a-z0-9]/gi, '_')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerNotice('Nómina oficial de jugadores descargada en CSV');
+  };
+
+  // Guardar Edición de Miembro / Deportista
+  const handleSaveMemberProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('profiles').update({
+          categoria_ajedrez: editingMember.categoria_ajedrez,
+          elo_rating: Number(editingMember.elo_rating),
+          fide_id: editingMember.fide_id,
+          role: editingMember.role,
+          estado: editingMember.estado,
+        }).eq('id', editingMember.id);
+      } catch (err) {
+        console.error('Error actualizando perfil en Supabase:', err);
+      }
+    }
+    setMembers(members.map((m) => (m.id === editingMember.id ? editingMember : m)));
+    setEditingMember(null);
+    triggerNotice('Ficha deportiva de afiliado actualizada');
+  };
+
   // Horario de clase
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -453,6 +568,7 @@ export const AdminDashboardView: React.FC = () => {
             { id: 'events', label: 'Torneos & Eventos', icon: <Trophy size={18} /> },
             { id: 'blog', label: 'Blog & Noticias', icon: <BookOpen size={18} /> },
             { id: 'documents', label: 'Documentos Afiliados', icon: <FileText size={18} /> },
+            { id: 'gallery', label: 'Galería Multimedia', icon: <Camera size={18} /> },
             { id: 'members', label: 'Afiliados & Roles', icon: <Users size={18} /> },
             { id: 'payments', label: 'Cuotas & Pagos', icon: <CreditCard size={18} /> },
             { id: 'schedules', label: 'Horarios de Clase', icon: <Calendar size={18} /> },
@@ -975,6 +1091,137 @@ export const AdminDashboardView: React.FC = () => {
                   })()}
                 </div>
               </div>
+
+              {/* Sub-sección: Nómina de Preinscritos a Torneos */}
+              <div style={{ marginTop: '3rem', borderTop: '1px solid #222', paddingTop: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Award size={20} />
+                      Nómina de Preinscritos a Torneos ({registrations.length})
+                    </h2>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Gestiona la asistencia, confirma pagos y exporta el listado para el software de emparejamiento (Swiss-Manager / Sevilla)
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.8rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleExportRosterCSV(selectedTournamentFilter === 'all' ? (events[0]?.id ?? '') : selectedTournamentFilter)}
+                      className="btn btn--sm btn--primary"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <Download size={14} />
+                      <span>Exportar Nómina (.csv)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tabla de Preinscritos */}
+                <div style={{ background: '#121212', border: '1px solid #252525', borderRadius: '12px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#181818', borderBottom: '1px solid #2a2a2a', color: '#888', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.05em' }}>
+                        <th style={{ padding: '0.8rem 1rem' }}>Deportista</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Categoría & Elo</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Torneo</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Contacto</th>
+                        <th style={{ padding: '0.8rem 1rem' }}>Estado</th>
+                        <th style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const filteredRegs = registrations.filter((r) =>
+                          selectedTournamentFilter === 'all' || r.event_id === selectedTournamentFilter
+                        );
+
+                        if (filteredRegs.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                                No hay deportistas inscritos en este torneo aún.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filteredRegs.map((reg) => {
+                          const ev = events.find((e) => e.id === reg.event_id);
+                          const prof = reg.profile || members.find((m) => m.id === reg.user_id);
+
+                          return (
+                            <tr key={reg.id} style={{ borderBottom: '1px solid #1f1f1f' }}>
+                              <td style={{ padding: '0.8rem 1rem' }}>
+                                <div style={{ fontWeight: 600, color: '#fff' }}>
+                                  {prof ? `${prof.nombre} ${prof.apellido}` : 'Deportista Afiliado'}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#777' }}>
+                                  @{prof?.usuario || 'afiliado'}
+                                </div>
+                              </td>
+                              <td style={{ padding: '0.8rem 1rem' }}>
+                                <div style={{ color: 'var(--gold)', fontWeight: 600 }}>
+                                  {prof?.categoria_ajedrez || 'Iniciación'}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                                  Elo: {prof?.elo_rating || 'S/E'} {prof?.fide_id ? `· FIDE: ${prof.fide_id}` : ''}
+                                </div>
+                              </td>
+                              <td style={{ padding: '0.8rem 1rem', color: '#ccc' }}>
+                                {ev?.title || 'Torneo General'}
+                              </td>
+                              <td style={{ padding: '0.8rem 1rem' }}>
+                                <div style={{ color: '#aaa' }}>{prof?.correo || 'N/A'}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#666' }}>{prof?.telefono || 'Sin tel'}</div>
+                              </td>
+                              <td style={{ padding: '0.8rem 1rem' }}>
+                                <span
+                                  style={{
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    background: reg.status === 'confirmed' ? '#14381e' : reg.status === 'attended' ? '#1b2f4a' : '#333',
+                                    color: reg.status === 'confirmed' ? '#81c784' : reg.status === 'attended' ? '#90caf9' : '#ccc',
+                                    border: `1px solid ${reg.status === 'confirmed' ? '#2e7d32' : reg.status === 'attended' ? '#1565c0' : '#444'}`,
+                                  }}
+                                >
+                                  {reg.status === 'confirmed' ? 'Confirmado' : reg.status === 'attended' ? 'En Sala / Asistió' : reg.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '0.3rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRegistrationStatus(reg.id, 'confirmed')}
+                                    className="btn btn--sm"
+                                    style={{ background: '#1c2e1c', color: '#a5d6a7', border: '1px solid #2e7d32', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
+                                    title="Confirmar inscripción"
+                                  >
+                                    Confirmar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateRegistrationStatus(reg.id, 'attended')}
+                                    className="btn btn--sm"
+                                    style={{ background: '#182538', color: '#90caf9', border: '1px solid #1976d2', padding: '0.2rem 0.45rem', fontSize: '0.7rem' }}
+                                    title="Marcar presencia en sala de juego"
+                                  >
+                                    Presente
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1153,6 +1400,110 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
+          {/* SECCIÓN: GALERÍA MULTIMEDIA */}
+          {activeSection === 'gallery' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    Galería Multimedia del Club
+                  </h1>
+                  <p style={{ color: '#888', margin: 0 }}>
+                    Sube fotografías, asigna categorías de visualización y administra la memoria histórica del club
+                  </p>
+                </div>
+                <button onClick={() => setShowGalleryModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Plus size={16} /> Añadir Fotografía
+                </button>
+              </div>
+
+              {showGalleryModal && (
+                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                  <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Nueva Fotografía para la Galería</h3>
+                  <form onSubmit={handleCreateGalleryItem} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ruta o URL de la imagen (ej. assets/img/campeon-sub8.webp)"
+                        value={newGalleryItem.src}
+                        onChange={(e) => setNewGalleryItem({ ...newGalleryItem, src: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                      <select
+                        value={newGalleryItem.category}
+                        onChange={(e) => setNewGalleryItem({ ...newGalleryItem, category: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      >
+                        <option value="torneos">Torneos y Competencias</option>
+                        <option value="infantil">Categorías Infantiles</option>
+                        <option value="adultos">Equipo de Adultos</option>
+                        <option value="delegacion">Delegaciones y Viajes</option>
+                        <option value="sede">Sede e Instalaciones</option>
+                        <option value="comunidad">Comunidad y Familias</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Pie de foto / Leyenda descriptiva"
+                        value={newGalleryItem.caption}
+                        onChange={(e) => setNewGalleryItem({ ...newGalleryItem, caption: e.target.value })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        placeholder="Orden de visualización (ej. 1)"
+                        value={newGalleryItem.order_index}
+                        onChange={(e) => setNewGalleryItem({ ...newGalleryItem, order_index: Number(e.target.value) })}
+                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button type="submit" className="btn btn--primary btn--sm">Guardar en Galería</button>
+                      <button type="button" onClick={() => setShowGalleryModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.25rem' }}>
+                {gallery.map((item) => (
+                  <div key={item.id} style={{ background: '#131313', border: '1px solid #222', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ aspectRatio: '16/10', overflow: 'hidden', background: '#0a0a0a' }}>
+                      <img src={item.src} alt={item.alt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1 }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--gold)', textTransform: 'uppercase', fontWeight: 700 }}>
+                          {item.category || 'General'}
+                        </span>
+                        <p style={{ margin: '0.3rem 0 0.8rem', fontSize: '0.85rem', color: '#ddd', fontWeight: 500 }}>
+                          {item.caption}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #222', paddingTop: '0.6rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#666' }}>Orden: #{item.order_index || 1}</span>
+                        <button
+                          onClick={() => handleDeleteGalleryItem(item.id)}
+                          className="btn btn--sm"
+                          style={{ background: '#2e1212', color: '#ff8a80', border: '1px solid #b71c1c', padding: '0.25rem 0.5rem' }}
+                          title="Eliminar foto"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 6. SECCIÓN: AFILIADOS & ROLES */}
           {activeSection === 'members' && (
             <div>
@@ -1170,6 +1521,77 @@ export const AdminDashboardView: React.FC = () => {
                   <span>Exportar Lista a CSV</span>
                 </button>
               </div>
+
+              {/* Modal de Edición de Deportista */}
+              {editingMember && (
+                <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
+                  <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>
+                    Editar Ficha Deportiva: {editingMember.nombre} {editingMember.apellido}
+                  </h3>
+                  <form onSubmit={handleSaveMemberProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Categoría de Ajedrez</label>
+                        <input
+                          type="text"
+                          value={editingMember.categoria_ajedrez || ''}
+                          onChange={(e) => setEditingMember({ ...editingMember, categoria_ajedrez: e.target.value })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rating Elo</label>
+                        <input
+                          type="number"
+                          value={editingMember.elo_rating || 0}
+                          onChange={(e) => setEditingMember({ ...editingMember, elo_rating: Number(e.target.value) })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>ID FIDE Oficial</label>
+                        <input
+                          type="text"
+                          value={editingMember.fide_id || ''}
+                          onChange={(e) => setEditingMember({ ...editingMember, fide_id: e.target.value })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Rol en Plataforma</label>
+                        <select
+                          value={editingMember.role}
+                          onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value as any })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        >
+                          <option value="student">Afiliado / Alumno</option>
+                          <option value="admin">Administrador Directivo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.25rem' }}>Estado de Membresía</label>
+                        <select
+                          value={editingMember.estado}
+                          onChange={(e) => setEditingMember({ ...editingMember, estado: e.target.value as any })}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        >
+                          <option value="active">Activo</option>
+                          <option value="inactive">Inactivo</option>
+                          <option value="pending">Pendiente</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.8rem', marginTop: '0.5rem' }}>
+                      <button type="submit" className="btn btn--primary btn--sm">Guardar Ficha</button>
+                      <button type="button" onClick={() => setEditingMember(null)} className="btn btn--ghost btn--sm">Cancelar</button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Buscador */}
               <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
@@ -1192,7 +1614,7 @@ export const AdminDashboardView: React.FC = () => {
                       <th style={{ padding: '1rem' }}>Categoría</th>
                       <th style={{ padding: '1rem' }}>Elo</th>
                       <th style={{ padding: '1rem' }}>Rol</th>
-                      <th style={{ padding: '1rem', textAlign: 'right' }}>Acción</th>
+                      <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1224,13 +1646,24 @@ export const AdminDashboardView: React.FC = () => {
                             </span>
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <button
-                              onClick={() => handleToggleMemberRole(m.id, m.role)}
-                              className="btn btn--ghost btn--sm"
-                              style={{ fontSize: '0.75rem' }}
-                            >
-                              Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
-                            </button>
+                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button
+                                onClick={() => setEditingMember(m)}
+                                className="btn btn--ghost btn--sm"
+                                style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                title="Editar ficha deportiva"
+                              >
+                                <Edit size={12} />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                onClick={() => handleToggleMemberRole(m.id, m.role)}
+                                className="btn btn--ghost btn--sm"
+                                style={{ fontSize: '0.75rem' }}
+                              >
+                                Hacer {m.role === 'admin' ? 'Afiliado' : 'Admin'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
