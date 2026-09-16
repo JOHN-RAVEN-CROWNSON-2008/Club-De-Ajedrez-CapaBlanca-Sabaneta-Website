@@ -8,7 +8,7 @@ export const AdminLoginView: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginAsDemo } = useAuth();
+  const { login, loginAsDemo, isConfigured } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,17 +99,22 @@ export const AdminLoginView: React.FC = () => {
           </button>
         </form>
 
-        <div style={{ marginTop: '1.8rem', paddingTop: '1.4rem', borderTop: '1px solid #222', textAlign: 'center' }}>
-          <button
-            type="button"
-            onClick={handleDemoAdmin}
-            className="btn btn--ghost btn--sm"
-            style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderColor: '#444' }}
-          >
-            <ShieldCheck size={16} color="var(--gold)" />
-            <span>Entrar como Administrador Demo (Prueba Rápida)</span>
-          </button>
-        </div>
+        {/* Acceso demo: solo disponible mientras Supabase no está configurado (.env con placeholders).
+            Con credenciales reales, este botón se oculta para no simular sesiones falsas que
+            luego fallan en silencio contra las políticas RLS reales. */}
+        {!isConfigured && (
+          <div style={{ marginTop: '1.8rem', paddingTop: '1.4rem', borderTop: '1px solid #222', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={handleDemoAdmin}
+              className="btn btn--ghost btn--sm"
+              style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderColor: '#444' }}
+            >
+              <ShieldCheck size={16} color="var(--gold)" />
+              <span>Entrar como Administrador Demo (Prueba Rápida)</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

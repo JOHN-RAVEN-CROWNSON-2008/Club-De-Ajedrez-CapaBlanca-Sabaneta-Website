@@ -97,18 +97,21 @@ export const MemberLoginView: React.FC = () => {
           </button>
         </form>
 
-        {/* Demo Fast Access button */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px solid #222', textAlign: 'center' }}>
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            className="btn btn--ghost btn--sm"
-            style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', borderColor: '#444' }}
-          >
-            <ShieldCheck size={16} color="var(--gold)" />
-            <span>Entrar como Afiliado Demo (Prueba Rápida)</span>
-          </button>
-        </div>
+        {/* Acceso demo: solo disponible mientras Supabase no está configurado (.env con placeholders).
+            Con credenciales reales, este botón se oculta para no simular sesiones falsas. */}
+        {!isConfigured && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.2rem', borderTop: '1px solid #222', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              className="btn btn--ghost btn--sm"
+              style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', borderColor: '#444' }}
+            >
+              <ShieldCheck size={16} color="var(--gold)" />
+              <span>Entrar como Afiliado Demo (Prueba Rápida)</span>
+            </button>
+          </div>
+        )}
 
         <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.85rem', color: '#888' }}>
           ¿Aún no tienes cuenta de afiliado?{' '}
