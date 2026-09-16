@@ -185,42 +185,132 @@ export const MembershipApplicationView: React.FC = () => {
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: '0 1rem' }}>
         {submitted ? (
           <div style={{ background: '#ffffff', borderRadius: '20px', padding: '3rem 2rem', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-            <div style={{ width: '70px', height: '70px', background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#16a34a' }}>
-              <CheckCircle2 size={42} />
-            </div>
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              ¡Solicitud Radicada Exitosamente!
-            </span>
-            <h2 style={{ fontSize: '1.8rem', color: '#0f172a', margin: '0.5rem 0 1rem', fontFamily: 'var(--font-display)' }}>
-              Bienvenido(a) a la Familia Capablanca
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '580px', margin: '0 auto 1.5rem', lineHeight: 1.6 }}>
-              Hemos recibido los datos de <strong>{formData.applicant_name} {formData.applicant_lastname}</strong> para la categoría <strong>{formData.desired_category}</strong>. El cuerpo técnico revisará la información para la clase diagnóstica.
-            </p>
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden;
+                }
+                #print-application-receipt, #print-application-receipt * {
+                  visibility: visible;
+                }
+                #print-application-receipt {
+                  position: fixed;
+                  left: 0;
+                  top: 0;
+                  width: 100vw;
+                  height: 100vh;
+                  margin: 0;
+                  padding: 2cm 2.5cm;
+                  background: #fff !important;
+                  color: #000 !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  z-index: 99999;
+                  box-sizing: border-box;
+                }
+                .no-print {
+                  display: none !important;
+                }
+              }
+            `}</style>
 
-            {/* Código de Radicado */}
-            <div style={{ background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '12px', padding: '1.25rem', maxWidth: '420px', margin: '0 auto 2rem' }}>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Número Oficial de Radicado</span>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gold-deep)', letterSpacing: '0.08em', marginTop: '0.25rem' }}>
-                {applicationCode}
+            {/* Contenedor oficial para impresión y visualización */}
+            <div id="print-application-receipt">
+              {/* Encabezado Institucional Exclusivo de Impresión */}
+              <div style={{ borderBottom: '2px solid #000', paddingBottom: '1rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                  <img src="/assets/img/logo-capablanca.png" alt="Club Capablanca" style={{ width: '60px', height: '60px', objectFit: 'contain' }} />
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#000', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Club Deportivo de Ajedrez Capablanca Sabaneta
+                    </h2>
+                    <p style={{ fontSize: '0.78rem', color: '#444', margin: '0.2rem 0 0' }}>
+                      Personería Jurídica & Reconocimiento Deportivo Inder Sabaneta Res. 042 · NIT 901.445.892-1
+                    </p>
+                    <p style={{ fontSize: '0.75rem', color: '#666', margin: '0.1rem 0 0' }}>
+                      Sede Oficial: Centro Comercial Aves María, piso 3 · Sabaneta, Antioquia
+                    </p>
+                  </div>
+                </div>
+                <div style={{ background: '#f5f5f5', padding: '0.4rem 0.8rem', borderRadius: '4px', display: 'inline-block', marginTop: '0.5rem', border: '1px solid #ddd' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Comprobante Oficial de Radicación de Solicitud de Afiliación 2026
+                  </span>
+                </div>
+              </div>
+
+              <div className="no-print" style={{ width: '70px', height: '70px', background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#16a34a' }}>
+                <CheckCircle2 size={42} />
+              </div>
+              <span className="no-print" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                ¡Solicitud Radicada Exitosamente!
+              </span>
+              <h2 className="no-print" style={{ fontSize: '1.8rem', color: '#0f172a', margin: '0.5rem 0 1rem', fontFamily: 'var(--font-display)' }}>
+                Bienvenido(a) a la Familia Capablanca
+              </h2>
+              <p className="no-print" style={{ color: '#64748b', fontSize: '1rem', maxWidth: '580px', margin: '0 auto 1.5rem', lineHeight: 1.6 }}>
+                Hemos recibido los datos de <strong>{formData.applicant_name} {formData.applicant_lastname}</strong> para la categoría <strong>{formData.desired_category}</strong>. El cuerpo técnico revisará la información para la clase diagnóstica.
+              </p>
+
+              {/* Código de Radicado */}
+              <div style={{ background: '#f8fafc', border: '2px dashed #94a3b8', borderRadius: '12px', padding: '1rem 1.25rem', maxWidth: '440px', margin: '0 auto 1.5rem', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: '#475569', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  Número Oficial de Radicado
+                </span>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.08em', marginTop: '0.25rem' }}>
+                  {applicationCode}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Fecha: {new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+              </div>
+
+              {/* Resumen detallado de datos */}
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1.25rem 1.5rem', textAlign: 'left', marginBottom: '1.5rem', fontSize: '0.88rem', color: '#1e293b', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 0.8rem', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
+                  Datos del Deportista Aspirante
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem 1.5rem' }}>
+                  <div><strong>Deportista:</strong> {formData.applicant_name} {formData.applicant_lastname}</div>
+                  <div><strong>Documento:</strong> {formData.doc_type} {formData.doc_number}</div>
+                  <div><strong>Edad:</strong> {formData.age ? `${formData.age} años` : 'No informada'}</div>
+                  <div><strong>Municipio:</strong> {formData.municipality}</div>
+                  <div><strong>Teléfono:</strong> {formData.phone}</div>
+                  <div><strong>Correo:</strong> {formData.email}</div>
+                  <div><strong>Categoría:</strong> {formData.desired_category}</div>
+                  <div><strong>Elo aproximado:</strong> {formData.approximate_elo || '0'}</div>
+                  <div><strong>EPS / Salud:</strong> {formData.health_provider || 'Particular'}</div>
+                  {formData.guardian_name && <div><strong>Acudiente:</strong> {formData.guardian_name} ({formData.guardian_phone})</div>}
+                </div>
+              </div>
+
+              {/* Indicaciones para la Clase Diagnóstica */}
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '10px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem', background: '#fff', fontSize: '0.82rem', color: '#334155' }}>
+                <strong style={{ display: 'block', color: '#0f172a', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
+                  Protocolo de Citación a Clase Diagnóstica Presencial:
+                </strong>
+                <ol style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: 1.6 }}>
+                  <li>Presentar este comprobante en la recepción del club en CC Aves María (piso 3, Sabaneta).</li>
+                  <li>Asistir con 10 minutos de anticipación en ropa cómoda.</li>
+                  <li>La evaluación deportiva evalúa conceptos tácticos, visión espacial y disciplina en sala de juego.</li>
+                </ol>
+              </div>
+
+              {/* Firmas oficiales en versión impresa */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2.5rem', paddingTop: '1.5rem', textAlign: 'center' }}>
+                <div style={{ borderTop: '1px solid #000', paddingTop: '0.4rem' }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem' }}>Comisión Técnica & Entrenadores</p>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#555' }}>Club Deportivo de Ajedrez Capablanca</p>
+                </div>
+                <div style={{ borderTop: '1px solid #000', paddingTop: '0.4rem' }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem' }}>Firma del Deportista o Acudiente</p>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#555' }}>Documento: {formData.doc_number}</p>
+                </div>
               </div>
             </div>
 
-            {/* Resumen de datos */}
-            <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '1.25rem', textAlign: 'left', marginBottom: '2rem', fontSize: '0.9rem', color: '#334155', lineHeight: 1.6 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                <div><strong>Documento:</strong> {formData.doc_type} {formData.doc_number}</div>
-                <div><strong>Edad:</strong> {formData.age ? `${formData.age} años` : 'No informada'}</div>
-                <div><strong>Municipio:</strong> {formData.municipality}</div>
-                <div><strong>Teléfono:</strong> {formData.phone}</div>
-                <div><strong>Correo:</strong> {formData.email}</div>
-                <div><strong>EPS:</strong> {formData.health_provider || 'Particular'}</div>
-                {formData.guardian_name && <div><strong>Acudiente:</strong> {formData.guardian_name} ({formData.guardian_phone})</div>}
-              </div>
-            </div>
-
-            {/* Acciones */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem' }}>
+            {/* Acciones para pantalla */}
+            <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1rem', marginTop: '1.5rem' }}>
               <button
                 type="button"
                 className="btn btn--primary"
@@ -241,11 +331,11 @@ export const MembershipApplicationView: React.FC = () => {
                 onClick={handlePrint}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
               >
-                <Download size={18} /> Imprimir Comprobante
+                <Download size={18} /> Imprimir Comprobante Oficial
               </button>
             </div>
 
-            <div style={{ marginTop: '2.5rem' }}>
+            <div className="no-print" style={{ marginTop: '2.5rem' }}>
               <button
                 type="button"
                 onClick={() => {
