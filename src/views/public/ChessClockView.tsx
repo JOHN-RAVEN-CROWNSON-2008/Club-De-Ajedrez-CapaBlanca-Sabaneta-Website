@@ -109,7 +109,7 @@ export const ChessClockView: React.FC = () => {
     setShowConfig(false);
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setWhiteTime(selectedPreset.minutes * 60 * 1000);
     setBlackTime(selectedPreset.minutes * 60 * 1000);
     setActivePlayer(null);
@@ -117,9 +117,9 @@ export const ChessClockView: React.FC = () => {
     setMoveCountWhite(0);
     setMoveCountBlack(0);
     playClickSound(500, 0.08);
-  };
+  }, [selectedPreset, playClickSound]);
 
-  const handleTogglePlay = () => {
+  const handleTogglePlay = useCallback(() => {
     if (!activePlayer) {
       setActivePlayer('white');
       setIsRunning(true);
@@ -127,9 +127,9 @@ export const ChessClockView: React.FC = () => {
       setIsRunning((prev) => !prev);
     }
     playClickSound(600, 0.05);
-  };
+  }, [activePlayer, playClickSound]);
 
-  const handleSwitchToBlack = () => {
+  const handleSwitchToBlack = useCallback(() => {
     if (!isRunning && activePlayer === null) {
       setActivePlayer('black');
       setIsRunning(true);
@@ -143,9 +143,9 @@ export const ChessClockView: React.FC = () => {
       setActivePlayer('black');
       playClickSound(850, 0.04);
     }
-  };
+  }, [isRunning, activePlayer, selectedPreset.increment, playClickSound]);
 
-  const handleSwitchToWhite = () => {
+  const handleSwitchToWhite = useCallback(() => {
     if (!isRunning && activePlayer === null) {
       setActivePlayer('white');
       setIsRunning(true);
@@ -159,7 +159,44 @@ export const ChessClockView: React.FC = () => {
       setActivePlayer('white');
       playClickSound(750, 0.04);
     }
-  };
+  }, [isRunning, activePlayer, selectedPreset.increment, playClickSound]);
+
+  // Atajos de teclado para juego fluido (Espacio, P, R)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isRunning && activePlayer === null) {
+          setActivePlayer('white');
+          setIsRunning(true);
+          playClickSound(800, 0.04);
+        } else if (isRunning) {
+          if (activePlayer === 'white') {
+            handleSwitchToBlack();
+          } else if (activePlayer === 'black') {
+            handleSwitchToWhite();
+          }
+        } else {
+          setIsRunning(true);
+          playClickSound(600, 0.05);
+        }
+      } else if (e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handleTogglePlay();
+      } else if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        handleReset();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRunning, activePlayer, handleSwitchToBlack, handleSwitchToWhite, handleTogglePlay, handleReset, playClickSound]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -407,31 +444,38 @@ export const ChessClockView: React.FC = () => {
           borderTop: '1px solid #222',
           padding: '1.2rem 2rem',
           display: 'flex',
-          justifyContent: 'center',
+          flexDirection: 'column',
           alignItems: 'center',
-          gap: '1.5rem',
+          gap: '0.8rem',
         }}
       >
-        <button
-          type="button"
-          onClick={handleTogglePlay}
-          className="btn btn--primary"
-          style={{ padding: '0.8rem 2.2rem', fontSize: '1.05rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-        >
-          {isRunning ? <Pause size={18} /> : <Play size={18} />}
-          <span>{isRunning ? 'Pausar Reloj' : (activePlayer ? 'Reanudar' : 'Iniciar Reloj')}</span>
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem' }}>
+          <button
+            type="button"
+            onClick={handleTogglePlay}
+            className="btn btn--primary"
+            style={{ padding: '0.8rem 2.2rem', fontSize: '1.05rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            {isRunning ? <Pause size={18} /> : <Play size={18} />}
+            <span>{isRunning ? 'Pausar Reloj' : (activePlayer ? 'Reanudar' : 'Iniciar Reloj')}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={handleReset}
-          className="btn btn--ghost"
-          style={{ padding: '0.8rem 1.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
-          title="Reiniciar a tiempo inicial"
-        >
-          <RotateCcw size={16} />
-          <span>Reiniciar</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="btn btn--ghost"
+            style={{ padding: '0.8rem 1.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
+            title="Reiniciar a tiempo inicial"
+          >
+            <RotateCcw size={16} />
+            <span>Reiniciar</span>
+          </button>
+        </div>
+
+        {/* Guía de Atajos de Teclado */}
+        <div style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center' }}>
+          Atajos de teclado: <kbd style={{ background: '#1c1c1c', border: '1px solid #333', padding: '0.15rem 0.4rem', borderRadius: '4px', color: '#ccc' }}>Espacio</kbd> Alternar turno / Reanudar · <kbd style={{ background: '#1c1c1c', border: '1px solid #333', padding: '0.15rem 0.4rem', borderRadius: '4px', color: '#ccc' }}>P</kbd> Pausar · <kbd style={{ background: '#1c1c1c', border: '1px solid #333', padding: '0.15rem 0.4rem', borderRadius: '4px', color: '#ccc' }}>R</kbd> Reiniciar
+        </div>
       </div>
     </div>
   );
