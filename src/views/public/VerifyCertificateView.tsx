@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { ShieldCheck, Search, Award, CheckCircle2, AlertCircle, ExternalLink, Trophy, Medal } from 'lucide-react';
+import { ShieldCheck, Search, Award, CheckCircle2, AlertCircle, ExternalLink, Trophy, Medal, ClipboardList, MessageCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { INITIAL_MEMBERS, INITIAL_EVENTS, INITIAL_MATCHES } from '../../lib/initialData';
-import { UserProfile, ClubEvent, TournamentMatch } from '../../types/database';
+import { INITIAL_MEMBERS, INITIAL_EVENTS, INITIAL_MATCHES, INITIAL_APPLICATIONS } from '../../lib/initialData';
+import { UserProfile, ClubEvent, TournamentMatch, MembershipApplication } from '../../types/database';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { calculateTournamentStandings } from '../../lib/tournamentStandings';
+import { whatsappService } from '../../services/whatsappService';
 
 interface VerifiedDiploma extends TournamentCertificateData {
   certHash: string;
@@ -19,9 +20,11 @@ export const VerifyCertificateView: React.FC = () => {
   const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
+  const [applications, setApplications] = useState<MembershipApplication[]>(INITIAL_APPLICATIONS);
   
   const [matchedMember, setMatchedMember] = useState<UserProfile | null>(null);
   const [matchedDiploma, setMatchedDiploma] = useState<VerifiedDiploma | null>(null);
+  const [matchedApplication, setMatchedApplication] = useState<MembershipApplication | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -32,10 +35,11 @@ export const VerifyCertificateView: React.FC = () => {
     const fetchData = async () => {
       if (isSupabaseConfigured()) {
         try {
-          const [profilesRes, eventsRes, matchesRes] = await Promise.all([
+          const [profilesRes, eventsRes, matchesRes, appsRes] = await Promise.all([
             supabase.from('profiles').select('*'),
             supabase.from('events').select('*'),
             supabase.from('tournament_matches').select('*'),
+            supabase.from('membership_applications').select('*'),
           ]);
 
           if (!profilesRes.error && profilesRes.data && profilesRes.data.length > 0) {
@@ -46,6 +50,9 @@ export const VerifyCertificateView: React.FC = () => {
           }
           if (!matchesRes.error && matchesRes.data && matchesRes.data.length > 0) {
             setMatches(matchesRes.data as TournamentMatch[]);
+          }
+          if (!appsRes.error && appsRes.data && appsRes.data.length > 0) {
+            setApplications(appsRes.data as MembershipApplication[]);
           }
         } catch (err) {
           console.warn('Usando datos locales para validación:', err);
@@ -97,6 +104,7 @@ export const VerifyCertificateView: React.FC = () => {
     if (!cleanQuery) {
       setMatchedMember(null);
       setMatchedDiploma(null);
+      setMatchedApplication(null);
       setIsSearching(false);
       return;
     }
@@ -108,13 +116,17 @@ export const VerifyCertificateView: React.FC = () => {
       const fideId = (m.fide_id || '').toLowerCase();
       const fullName = `${m.nombre} ${m.apellido}`.toLowerCase();
       const email = (m.correo || '').toLowerCase();
+      const doc = (m.doc_number || '').toLowerCase();
+      const user = (m.usuario || '').toLowerCase();
 
       return (
         memberCode.includes(cleanQuery) ||
         directId === cleanQuery ||
         fideId === cleanQuery ||
         fullName.includes(cleanQuery) ||
-        email === cleanQuery
+        email === cleanQuery ||
+        (doc && doc === cleanQuery) ||
+        (user && user === cleanQuery)
       );
     });
 
@@ -131,8 +143,29 @@ export const VerifyCertificateView: React.FC = () => {
       );
     });
 
+    // 3. Buscar en Solicitudes de Afiliación / Radicados
+    const foundApp = applications.find((a) => {
+      const doc = (a.doc_number || '').toLowerCase();
+      const email = (a.email || '').toLowerCase();
+      const name = `${a.applicant_name} ${a.applicant_lastname}`.toLowerCase();
+      const notes = (a.notes || '').toLowerCase();
+      const id = (a.id || '').toLowerCase();
+      const radicadoPattern = `sol-capa-${doc.slice(-6) || id.slice(0, 6)}-2026`;
+
+      return (
+        id === cleanQuery ||
+        doc === cleanQuery ||
+        email === cleanQuery ||
+        radicadoPattern.includes(cleanQuery) ||
+        cleanQuery.includes(doc) ||
+        (cleanQuery.length >= 6 && notes.includes(cleanQuery)) ||
+        (cleanQuery.length >= 4 && name.includes(cleanQuery))
+      );
+    });
+
     setMatchedMember(foundMember || null);
     setMatchedDiploma(foundDiploma || null);
+    setMatchedApplication(foundApp || null);
     setIsSearching(false);
   };
 
@@ -144,7 +177,7 @@ export const VerifyCertificateView: React.FC = () => {
       setSearchQuery(codeParam);
       verifyQuery(codeParam);
     }
-  }, [location.search, members, diplomasCatalog]);
+  }, [location.search, members, diplomasCatalog, applications]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +239,7 @@ export const VerifyCertificateView: React.FC = () => {
             <span>Ejemplos rápidos:</span>
             {[
               { label: 'Afiliación Santiago Gómez', code: 'CAPA-MEM001-2026' },
+              { label: 'Radicado Alejandro Giraldo', code: '1035982110' },
               { label: 'Diploma Torneo Relámpago', code: 'DIPL-790AE38B-2026' },
               { label: 'FIDE ID Andrés Arboleda', code: '4452205' },
             ].map((chip) => (
@@ -416,8 +450,109 @@ export const VerifyCertificateView: React.FC = () => {
               </div>
             )}
 
+            {/* 3. Resultado de Radicado de Solicitud de Afiliación */}
+            {matchedApplication && (
+              <div
+                style={{
+                  background: '#101622',
+                  border: '2px solid #2563eb',
+                  borderRadius: '16px',
+                  padding: '2.5rem',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#1d4ed8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ClipboardList size={28} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', color: '#93c5fd', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase' }}>
+                        Radicado Oficial de Admisión Deportiva
+                      </div>
+                      <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#fff', margin: '0.2rem 0 0' }}>
+                        {matchedApplication.applicant_name} {matchedApplication.applicant_lastname}
+                      </h2>
+                    </div>
+                  </div>
+
+                  <span
+                    style={{
+                      background: matchedApplication.status === 'approved' ? '#14532d' : matchedApplication.status === 'contacted' ? '#1e3a8a' : '#78350f',
+                      border: `1px solid ${matchedApplication.status === 'approved' ? '#22c55e' : matchedApplication.status === 'contacted' ? '#3b82f6' : '#f59e0b'}`,
+                      color: matchedApplication.status === 'approved' ? '#86efac' : matchedApplication.status === 'contacted' ? '#93c5fd' : '#fcd34d',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '50px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {matchedApplication.status === 'approved' ? 'Aprobada ✓ Afiliado Oficial' : matchedApplication.status === 'contacted' ? 'En Proceso · Citado a Diagnóstico' : 'Radicado Recibido · En Revisión'}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                    gap: '1rem',
+                    background: '#0a0f18',
+                    border: '1px solid #1e293b',
+                    borderRadius: '10px',
+                    padding: '1.5rem',
+                    margin: '1.5rem 0',
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Documento</span>
+                    <strong style={{ display: 'block', fontSize: '1.05rem', color: '#fff', marginTop: '0.2rem' }}>
+                      {matchedApplication.doc_type} {matchedApplication.doc_number}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Categoría Solicitada</span>
+                    <strong style={{ display: 'block', fontSize: '1.05rem', color: 'var(--gold)', marginTop: '0.2rem' }}>
+                      {matchedApplication.desired_category}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Municipio</span>
+                    <strong style={{ display: 'block', fontSize: '1.05rem', color: '#fff', marginTop: '0.2rem' }}>
+                      {matchedApplication.municipality || 'Sabaneta'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Radicado</span>
+                    <strong style={{ display: 'block', fontSize: '0.95rem', color: '#60a5fa', fontFamily: 'monospace', marginTop: '0.2rem' }}>
+                      {matchedApplication.notes?.includes('SOL-CAPA') ? (matchedApplication.notes.match(/SOL-CAPA-[A-Z0-9-]+/)?.[0] || `SOL-CAPA-${matchedApplication.doc_number?.slice(-6) || '2026'}`) : `SOL-CAPA-${matchedApplication.doc_number?.slice(-6) || matchedApplication.id.slice(0, 6).toUpperCase()}-2026`}
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.85rem', color: '#aaa', borderTop: '1px solid #1e293b', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <span>Sede Oficial: <strong>CC Aves María piso 3, Sabaneta (Res. Inder 042)</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => whatsappService.openApplicationContact(
+                      `${matchedApplication.applicant_name} ${matchedApplication.applicant_lastname}`,
+                      matchedApplication.phone,
+                      matchedApplication.desired_category,
+                      `SOL-CAPA-${matchedApplication.doc_number?.slice(-6) || '2026'}`
+                    )}
+                    className="btn btn--sm"
+                    style={{ background: '#25D366', color: '#fff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700 }}
+                  >
+                    <MessageCircle size={15} />
+                    <span>Consultar por WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Alerta de No Encontrado */}
-            {!matchedMember && !matchedDiploma && (
+            {!matchedMember && !matchedDiploma && !matchedApplication && (
               <div
                 style={{
                   background: '#231010',
@@ -432,7 +567,7 @@ export const VerifyCertificateView: React.FC = () => {
                   No se encontró ningún registro oficial
                 </h3>
                 <p style={{ color: '#ccc', maxWidth: '520px', margin: '0 auto 1.5rem', fontSize: '0.92rem', lineHeight: 1.6 }}>
-                  El código o documento ingresado (<strong>{searchQuery}</strong>) no corresponde a ningún certificado de afiliación ni diploma de torneo emitido por el Club Capablanca Sabaneta.
+                  El código o documento ingresado (<strong>{searchQuery}</strong>) no corresponde a ningún certificado de afiliación, diploma de torneo ni radicado de admisión emitido por el Club Capablanca Sabaneta.
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
                   <Link to="/contacto" className="btn btn--ghost btn--sm">
