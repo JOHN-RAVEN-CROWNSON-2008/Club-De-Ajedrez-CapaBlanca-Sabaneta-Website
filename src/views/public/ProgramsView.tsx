@@ -1,8 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ArrowRight, UserCheck, Sparkles, Monitor, Users } from 'lucide-react';
+import { Check, ArrowRight, UserCheck, Sparkles, Monitor, Users, GraduationCap, Clock, MapPin, Calendar } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { INITIAL_SCHEDULES } from '../../lib/initialData';
+import { ClassSchedule } from '../../types/database';
 
 export const ProgramsView: React.FC = () => {
+  const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
+
+  useEffect(() => {
+    async function loadSchedules() {
+      if (!isSupabaseConfigured()) {
+        setSchedules(INITIAL_SCHEDULES);
+        return;
+      }
+
+      try {
+        setLoadingSchedules(true);
+        const { data, error } = await supabase
+          .from('class_schedules')
+          .select('*')
+          .eq('active', true)
+          .order('category', { ascending: true });
+
+        if (data && data.length > 0) {
+          setSchedules(data as ClassSchedule[]);
+        } else {
+          setSchedules(INITIAL_SCHEDULES);
+        }
+      } catch (err) {
+        console.warn('Usando cronograma inicial por fallback:', err);
+        setSchedules(INITIAL_SCHEDULES);
+      } finally {
+        setLoadingSchedules(false);
+      }
+    }
+
+    loadSchedules();
+  }, []);
+
   const programs = [
     {
       id: 'infantil',
@@ -144,7 +181,7 @@ export const ProgramsView: React.FC = () => {
         </div>
       </section>
 
-      {/* Cronograma Semanal de Clases */}
+      {/* Cronograma Semanal de Clases Dinámico */}
       <section className="section section--dark" style={{ paddingBlock: '4rem' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
@@ -157,24 +194,86 @@ export const ProgramsView: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            {[
-              { cat: 'Iniciación Infantil (4 a 8 años)', day: 'Martes y Jueves', time: '4:00 PM - 5:30 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
-              { cat: 'Semillero Sub-12', day: 'Miércoles y Viernes', time: '4:00 PM - 6:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
-              { cat: 'Desarrollo Juvenil Sub-16', day: 'Lunes y Miércoles', time: '6:00 PM - 8:00 PM', mod: 'Híbrida', place: 'Sede / Zoom' },
-              { cat: 'Adultos & Aficionados', day: 'Sábados', time: '10:00 AM - 1:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
-              { cat: 'Alta Competencia', day: 'Sábados', time: '2:00 PM - 6:00 PM', mod: 'Presencial', place: 'CC Aves María, piso 3' },
-            ].map((item, idx) => (
-              <div key={idx} style={{ background: '#141414', border: '1px solid #282828', borderRadius: '12px', padding: '1.5rem' }}>
-                <span style={{ fontSize: '0.75rem', background: 'var(--gold)', color: '#000', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800, textTransform: 'uppercase' }}>
-                  {item.mod}
-                </span>
-                <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: '0.6rem 0 0.3rem' }}>{item.cat}</h3>
-                <p style={{ color: 'var(--gold)', fontWeight: 600, fontSize: '0.95rem', margin: '0.2rem 0' }}>{item.day} · {item.time}</p>
-                <p style={{ color: '#777', fontSize: '0.85rem', margin: 0 }}>{item.place}</p>
-              </div>
-            ))}
-          </div>
+          {loadingSchedules ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
+              Cargando cronograma oficial de clases...
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {schedules.map((item) => {
+                const isOnline = item.modality === 'Online';
+                const isHibrida = item.modality === 'Híbrida';
+                const badgeBg = isOnline ? 'rgba(59, 130, 246, 0.15)' : isHibrida ? 'rgba(168, 85, 247, 0.15)' : 'rgba(245, 197, 24, 0.15)';
+                const badgeColor = isOnline ? '#60a5fa' : isHibrida ? '#c084fc' : 'var(--gold)';
+                const badgeBorder = isOnline ? '#2563eb' : isHibrida ? '#9333ea' : 'var(--gold)';
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: '#141414',
+                      border: '1px solid #282828',
+                      borderRadius: '14px',
+                      padding: '1.5rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transition: 'border-color 0.2s, transform 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-3px)';
+                      e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.borderColor = '#282828';
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.75rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: 800, textTransform: 'uppercase' }}>
+                          {item.modality}
+                        </span>
+                      </div>
+                      <h3 style={{ fontSize: '1.18rem', color: '#fff', margin: '0.4rem 0 0.5rem', fontWeight: 700 }}>
+                        {item.category}
+                      </h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--gold)', fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.4rem' }}>
+                        <Clock size={15} style={{ flexShrink: 0 }} />
+                        <span>{item.day_of_week} · {item.time_range}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#bbb', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                        <GraduationCap size={15} style={{ flexShrink: 0, color: 'var(--gold)' }} />
+                        <span>{item.trainer || 'Entrenador Titulado'}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#777', fontSize: '0.82rem' }}>
+                        <MapPin size={15} style={{ flexShrink: 0 }} />
+                        <span>{item.location}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid #222' }}>
+                      <Link
+                        to="/afiliarse"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          color: 'var(--gold)',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <span>Postularse a este horario</span>
+                        <ArrowRight size={14} />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
