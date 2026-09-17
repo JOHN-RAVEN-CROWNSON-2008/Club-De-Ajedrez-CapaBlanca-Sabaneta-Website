@@ -51,6 +51,7 @@ export const TournamentsView: React.FC = () => {
         const { data: mtchs } = await supabase
           .from('tournament_matches')
           .select('*')
+          .order('round', { ascending: true })
           .order('board_number', { ascending: true });
 
         if (mtchs && mtchs.length > 0) {
@@ -324,7 +325,9 @@ export const TournamentsView: React.FC = () => {
 
                   {/* Sección Desplegable de Nómina, Emparejamientos & Clasificación */}
                   {(() => {
-                    const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                    const eventMatches = matches
+                      .filter((m) => m.event_id === evt.id)
+                      .sort((a, b) => a.round - b.round || a.board_number - b.board_number);
                     const eventStandings = calculateTournamentStandings(eventMatches);
                     const eventRegs = registrations.filter((r) => r.event_id === evt.id && r.status !== 'cancelled');
                     const parsedAthletes = eventRegs.map((r) => {

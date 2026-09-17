@@ -123,7 +123,7 @@ export const MembersDashboardView: React.FC = () => {
         const { data: attData } = await supabase.from('class_attendance').select('*').order('session_date', { ascending: false });
         if (attData && attData.length > 0) setAttendance(attData as ClassAttendance[]);
 
-        const { data: matchData } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
+        const { data: matchData } = await supabase.from('tournament_matches').select('*').order('round', { ascending: true }).order('board_number', { ascending: true });
         if (matchData && matchData.length > 0) setMatches(matchData as TournamentMatch[]);
 
         if (user) {
@@ -615,7 +615,9 @@ export const MembersDashboardView: React.FC = () => {
                       </div>
                       {/* Emparejamientos & Clasificación */}
                       {(() => {
-                        const eventMatches = matches.filter((m) => m.event_id === evt.id);
+                        const eventMatches = matches
+                          .filter((m) => m.event_id === evt.id)
+                          .sort((a, b) => a.round - b.round || a.board_number - b.board_number);
                         const eventRegs = registrations.filter((r) => r.event_id === evt.id && r.status !== 'cancelled');
                         const isExpanded = expandedEventId === evt.id;
                         const subTab = tournamentSubTabs[evt.id] || (eventMatches.length > 0 ? 'matches' : 'roster');

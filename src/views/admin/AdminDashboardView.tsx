@@ -180,7 +180,7 @@ export const AdminDashboardView: React.FC = () => {
         const { data: evts } = await supabase.from('events').select('*').order('created_at', { ascending: false });
         if (evts) setEvents(evts as ClubEvent[]);
 
-        const { data: mtchs } = await supabase.from('tournament_matches').select('*').order('board_number', { ascending: true });
+        const { data: mtchs } = await supabase.from('tournament_matches').select('*').order('round', { ascending: true }).order('board_number', { ascending: true });
         if (mtchs && mtchs.length > 0) setMatches(mtchs as TournamentMatch[]);
 
         const { data: gal } = await supabase.from('gallery').select('*').order('order_index', { ascending: true });
@@ -1950,9 +1950,9 @@ export const AdminDashboardView: React.FC = () => {
                 {/* Lista de Partidas Registradas */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {(() => {
-                    const filteredMatches = matches.filter((m) =>
-                      selectedTournamentFilter === 'all' || m.event_id === selectedTournamentFilter
-                    );
+                    const filteredMatches = matches
+                      .filter((m) => selectedTournamentFilter === 'all' || m.event_id === selectedTournamentFilter)
+                      .sort((a, b) => a.round - b.round || a.board_number - b.board_number);
 
                     if (filteredMatches.length === 0) {
                       return (
