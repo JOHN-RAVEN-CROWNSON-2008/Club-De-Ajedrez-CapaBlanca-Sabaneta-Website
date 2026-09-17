@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
           </div>
           <p style={{ color: '#aaa', fontSize: '0.95rem', lineHeight: '1.6' }}>
             Club Deportivo de Ajedrez con más de 12 años formando deportistas y seres humanos íntegros.
-            Clases para todas las edades, torneos y asesorías en modalidad presencial y online.
+            Reconocimiento Deportivo Inder Sabaneta Res. 042 · NIT 901.445.892-1.
           </p>
         </div>
 

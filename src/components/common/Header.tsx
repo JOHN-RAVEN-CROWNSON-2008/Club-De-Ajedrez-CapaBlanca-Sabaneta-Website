@@ -121,6 +121,15 @@ export const Header: React.FC = () => {
           {user ? `Mi Portal (${user.nombre})` : 'Ingresar a Portal Afiliados'}
         </Link>
 
+        <Link
+          to="/reloj"
+          className="btn btn--ghost"
+          style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderColor: '#333' }}
+          onClick={() => setDrawerOpen(false)}
+        >
+          <span>⏱️ Reloj de Ajedrez Oficial</span>
+        </Link>
+
         <a
           className="btn btn--primary"
           style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
