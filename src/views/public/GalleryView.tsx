@@ -2,11 +2,22 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_GALLERY } from '../../lib/initialData';
 import { GalleryItem } from '../../types/database';
-import { Image as ImageIcon, ZoomIn, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Image as ImageIcon, ZoomIn, X, ChevronLeft, ChevronRight, Search, MessageCircle, ExternalLink } from 'lucide-react';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  all: 'Todas las Fotos',
+  torneos: 'Torneos & Competencias',
+  infantil: 'Semillero Infantil',
+  adultos: 'Club de Adultos',
+  delegacion: 'Delegación Departamental',
+  sede: 'Sede CC Aves María',
+  comunidad: 'Comunidad & Familia',
+};
 
 export const GalleryView: React.FC = () => {
   const [gallery, setGallery] = useState<GalleryItem[]>(INITIAL_GALLERY);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -50,10 +61,20 @@ export const GalleryView: React.FC = () => {
 
   const filteredGallery = useMemo(() => {
     return gallery.filter((item) => {
-      if (selectedCategory === 'all') return true;
-      return item.category?.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesCategory =
+        selectedCategory === 'all' ||
+        item.category?.toLowerCase() === selectedCategory.toLowerCase();
+
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        (item.caption && item.caption.toLowerCase().includes(q)) ||
+        (item.alt && item.alt.toLowerCase().includes(q)) ||
+        (item.category && item.category.toLowerCase().includes(q));
+
+      return matchesCategory && matchesSearch;
     });
-  }, [gallery, selectedCategory]);
+  }, [gallery, selectedCategory, searchQuery]);
 
   const currentIndex = useMemo(() => {
     if (!selectedImage) return -1;
@@ -116,11 +137,13 @@ export const GalleryView: React.FC = () => {
       <section className="section" style={{ background: '#0a0a0a', color: '#fff', minHeight: '60vh', paddingBottom: '4rem' }}>
         <div className="wrap">
           {/* Barra de Filtros por Categoría con conteo */}
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '2.5rem', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.5rem', justifyContent: 'center' }}>
             {categories.map((cat) => {
               const count = cat === 'all' 
                 ? gallery.length 
                 : gallery.filter((item) => item.category?.toLowerCase() === cat).length;
+
+              const label = cat === 'all' ? 'Todas las Fotos' : (CATEGORY_LABELS[cat] || cat);
 
               return (
                 <button
@@ -140,10 +163,74 @@ export const GalleryView: React.FC = () => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  {cat === 'all' ? 'Todas las Fotos' : cat} ({count})
+                  {label} ({count})
                 </button>
               );
             })}
+          </div>
+
+          {/* Buscador reactivo dentro de la galería */}
+          <div style={{ maxWidth: '480px', margin: '0 auto 2.5rem', position: 'relative' }}>
+            <Search
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '1.1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--gold)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por momento, torneo, jugador o pie de foto..."
+              style={{
+                width: '100%',
+                padding: '0.75rem 2.8rem 0.75rem 2.8rem',
+                borderRadius: '30px',
+                background: '#141414',
+                border: '1px solid #333',
+                color: '#fff',
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'var(--gold)';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(245, 197, 24, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#333';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  cursor: 'pointer',
+                  padding: '0.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Limpiar búsqueda"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -151,18 +238,38 @@ export const GalleryView: React.FC = () => {
               Cargando galería fotográfica...
             </div>
           ) : filteredGallery.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#141414', borderRadius: '16px', border: '1px solid #282828', maxWidth: '500px', margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#141414', borderRadius: '16px', border: '1px solid #282828', maxWidth: '520px', margin: '0 auto' }}>
               <ImageIcon size={44} style={{ color: 'var(--gold)', margin: '0 auto 1rem', opacity: 0.7 }} />
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>No hay fotografías en esta categoría</h3>
-              <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Prueba seleccionando otra categoría o mira todas las fotos.</p>
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('all')}
-                className="btn btn--secondary"
-                style={{ fontSize: '0.85rem' }}
-              >
-                Ver todas las fotos
-              </button>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                {searchQuery ? 'No se encontraron fotografías' : 'No hay fotografías en esta categoría'}
+              </h3>
+              <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                {searchQuery
+                  ? `No se hallaron coincidencias para "${searchQuery}". Intenta con otros términos.`
+                  : 'Prueba seleccionando otra categoría o restablece el filtro.'}
+              </p>
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="btn btn--secondary"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    Limpiar búsqueda
+                  </button>
+                )}
+                {selectedCategory !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className="btn btn--secondary"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    Ver todas las fotos
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
@@ -378,16 +485,72 @@ export const GalleryView: React.FC = () => {
                 </p>
               </div>
 
-              {/* Indicador de posición y categoría */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span style={{ background: '#1c1c1c', border: '1px solid #333', color: '#ccc', padding: '0.25rem 0.7rem', borderRadius: '20px', fontSize: '0.78rem', textTransform: 'capitalize' }}>
-                  {selectedImage.category || 'General'}
+              {/* Botones de acción, categoría y posición */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <span style={{ background: '#1c1c1c', border: '1px solid #333', color: '#ccc', padding: '0.35rem 0.75rem', borderRadius: '20px', fontSize: '0.78rem' }}>
+                  {selectedImage.category ? (CATEGORY_LABELS[selectedImage.category.toLowerCase()] || selectedImage.category) : 'General'}
                 </span>
                 {filteredGallery.length > 1 && (
-                  <span style={{ color: 'var(--gold)', fontSize: '0.85rem', fontWeight: 700 }}>
+                  <span style={{ color: 'var(--gold)', fontSize: '0.85rem', fontWeight: 700, padding: '0 0.3rem' }}>
                     {currentIndex + 1} / {filteredGallery.length}
                   </span>
                 )}
+                <a
+                  href={resolveImageSrc(selectedImage.src)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #444',
+                    background: '#1a1a1a',
+                    color: '#eee',
+                    fontSize: '0.8rem',
+                    textDecoration: 'none',
+                    fontWeight: 500,
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--gold)';
+                    e.currentTarget.style.color = 'var(--gold)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#444';
+                    e.currentTarget.style.color = '#eee';
+                  }}
+                  title="Abrir imagen original en pestaña nueva"
+                >
+                  <ExternalLink size={13} />
+                  <span>Original</span>
+                </a>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`📸 ¡Fotografía del Club de Ajedrez Capablanca Sabaneta!\n"${selectedImage.caption}"\nMírala en: ${window.location.origin}/galeria`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.35rem 0.8rem',
+                    borderRadius: '8px',
+                    border: '1px solid #25D366',
+                    background: '#25D366',
+                    color: '#000',
+                    fontSize: '0.8rem',
+                    textDecoration: 'none',
+                    fontWeight: 700,
+                    transition: 'opacity 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                  title="Compartir por WhatsApp"
+                >
+                  <MessageCircle size={13} />
+                  <span>Compartir</span>
+                </a>
               </div>
             </div>
           </div>
