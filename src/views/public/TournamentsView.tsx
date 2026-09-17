@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_EVENTS, INITIAL_MATCHES, INITIAL_REGISTRATIONS } from '../../lib/initialData';
 import { ClubEvent, TournamentMatch, TournamentRegistration } from '../../types/database';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck, Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal, UserCheck, Users } from 'lucide-react';
+import {
+  Calendar, Clock, MapPin, Trophy, ArrowRight, ShieldCheck,
+  Swords, Eye, ChevronDown, ChevronUp, Download, Award, Medal,
+  UserCheck, Users, Search, X
+} from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { TournamentRegistrationModal } from '../../components/common/TournamentRegistrationModal';
@@ -14,6 +18,8 @@ export const TournamentsView: React.FC = () => {
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [registrations, setRegistrations] = useState<TournamentRegistration[]>(INITIAL_REGISTRATIONS);
   const [filter, setFilter] = useState<string>('all');
+  const [rhythmFilter, setRhythmFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [tournamentTab, setTournamentTab] = useState<Record<string, 'matches' | 'standings' | 'roster'>>({});
@@ -76,12 +82,41 @@ export const TournamentsView: React.FC = () => {
     loadData();
   }, []);
 
-  const filteredEvents = events.filter((ev) => {
-    if (filter === 'all') return true;
-    if (filter === 'infantil') return ev.category.toLowerCase().includes('infantil');
-    if (filter === 'abierto') return ev.category.toLowerCase().includes('abierto');
-    return true;
-  });
+  const abiertoCount = useMemo(() => events.filter((e) => e.category?.toLowerCase().includes('abierto')).length, [events]);
+  const infantilCount = useMemo(() => events.filter((e) => e.category?.toLowerCase().includes('infantil')).length, [events]);
+
+  const uniqueRhythms = useMemo(() => {
+    const list: string[] = [];
+    events.forEach((e) => {
+      const r = (e.rhythm || '').trim();
+      if (r && !list.includes(r)) list.push(r);
+    });
+    return list;
+  }, [events]);
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((ev) => {
+      if (filter === 'infantil' && !ev.category?.toLowerCase().includes('infantil')) return false;
+      if (filter === 'abierto' && !ev.category?.toLowerCase().includes('abierto')) return false;
+      if (rhythmFilter !== 'all' && ev.rhythm !== rhythmFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = (ev.title || '').toLowerCase().includes(q);
+        const matchDesc = (ev.description || '').toLowerCase().includes(q);
+        const matchLoc = (ev.location || '').toLowerCase().includes(q);
+        const matchRhythm = (ev.rhythm || '').toLowerCase().includes(q);
+        const matchCat = (ev.category || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc && !matchLoc && !matchRhythm && !matchCat) return false;
+      }
+      return true;
+    });
+  }, [events, filter, rhythmFilter, searchQuery]);
+
+  const handleResetFilters = () => {
+    setFilter('all');
+    setRhythmFilter('all');
+    setSearchQuery('');
+  };
 
   return (
     <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
@@ -102,35 +137,55 @@ export const TournamentsView: React.FC = () => {
       <section className="section" style={{ background: '#0e0e0e', color: '#fff', minHeight: '60vh' }}>
         <div className="wrap">
           
-          {/* Botones de filtro y Acceso a Reloj Digital */}
-          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '2.5rem', alignItems: 'center' }}>
-            <button
-              type="button"
-              className={`btn btn--sm ${filter === 'all' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setFilter('all')}
-            >
-              Todos los torneos
-            </button>
-            <button
-              type="button"
-              className={`btn btn--sm ${filter === 'abierto' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setFilter('abierto')}
-            >
-              Categoría Abierta
-            </button>
-            <button
-              type="button"
-              className={`btn btn--sm ${filter === 'infantil' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setFilter('infantil')}
-            >
-              Semilleros Infantiles
-            </button>
+          {/* Barra de Búsqueda y Enlace a Reloj Oficial */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: '500px' }}>
+              <Search size={17} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--gold)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar torneo por nombre, ritmo, sede o categoría..."
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 2.4rem 0.65rem 2.75rem',
+                  background: '#161616',
+                  border: '1px solid #333',
+                  borderRadius: '50px',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '0.85rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#888',
+                    cursor: 'pointer',
+                    padding: '0.2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title="Limpiar búsqueda"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
 
             <Link
               to="/reloj"
               className="btn btn--sm"
               style={{
-                marginLeft: 'auto',
                 background: 'linear-gradient(135deg, var(--gold), #e0a820)',
                 color: '#0a0a0a',
                 fontWeight: 700,
@@ -139,8 +194,8 @@ export const TournamentsView: React.FC = () => {
                 gap: '0.5rem',
                 textDecoration: 'none',
                 borderRadius: '8px',
-                padding: '0.5rem 1rem',
-                boxShadow: '0 4px 12px rgba(212,175,55,0.25)'
+                padding: '0.55rem 1.1rem',
+                boxShadow: '0 4px 12px rgba(212,175,55,0.25)',
               }}
             >
               <Clock size={16} />
@@ -148,13 +203,75 @@ export const TournamentsView: React.FC = () => {
             </Link>
           </div>
 
+          {/* Botones de filtro de Categoría y Ritmo */}
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '2.5rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              className={`btn btn--sm ${filter === 'all' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setFilter('all')}
+            >
+              Todos los torneos ({events.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${filter === 'abierto' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setFilter('abierto')}
+            >
+              Categoría Abierta ({abiertoCount})
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${filter === 'infantil' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setFilter('infantil')}
+            >
+              Semilleros Infantiles ({infantilCount})
+            </button>
+
+            {uniqueRhythms.length > 1 && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>Ritmo:</span>
+                <select
+                  value={rhythmFilter}
+                  onChange={(e) => setRhythmFilter(e.target.value)}
+                  style={{
+                    background: '#161616',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    color: 'var(--gold)',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="all">Todos los ritmos</option>
+                  {uniqueRhythms.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {loading ? (
             <div style={{ textAlign: 'center', padding: '4rem 0', color: '#888' }}>
               Cargando calendario oficial...
             </div>
           ) : filteredEvents.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '4rem 0', background: '#161616', borderRadius: '12px', border: '1px solid #222' }}>
-              <p style={{ color: '#aaa', fontSize: '1.1rem' }}>No hay torneos programados en esta categoría actualmente.</p>
+            <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#161616', borderRadius: '16px', border: '1px solid #222' }}>
+              <Trophy size={40} color="var(--gold)" style={{ margin: '0 auto 1rem', opacity: 0.7 }} />
+              <h3 style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '0.5rem' }}>No se encontraron torneos</h3>
+              <p style={{ color: '#aaa', fontSize: '0.95rem', marginBottom: '1.5rem', maxWidth: '420px', marginInline: 'auto' }}>
+                No hay torneos programados que coincidan con los filtros de búsqueda o categoría seleccionados.
+              </p>
+              {(searchQuery || filter !== 'all' || rhythmFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn btn--primary btn--sm"
+                >
+                  Restablecer todos los filtros
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '2rem' }}>
