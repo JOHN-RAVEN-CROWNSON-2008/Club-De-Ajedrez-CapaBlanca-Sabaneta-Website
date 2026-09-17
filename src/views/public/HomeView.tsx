@@ -169,13 +169,6 @@ export const HomeView: React.FC = () => {
         </div>
       </section>
 
-      {/* Reto Táctico del Día: Joyas de Capablanca */}
-      <section className="section" style={{ background: '#0a0a0a', borderTop: '1px solid #1f1f1f', borderBottom: '1px solid #1f1f1f' }}>
-        <div className="wrap" style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <DailyTacticalPuzzle />
-        </div>
-      </section>
-
       {/* 5. Próximos Torneos (Dinámicos) */}
       <section className="section" style={{ background: '#121212', color: '#fff' }}>
         <div className="wrap">

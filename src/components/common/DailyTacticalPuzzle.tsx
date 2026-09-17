@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Swords, Lightbulb, ChevronRight, RotateCcw, ExternalLink, Award, CheckCircle2 } from 'lucide-react';
+import { Swords, Lightbulb, ChevronRight, ChevronLeft, RotateCcw, ExternalLink, Award, CheckCircle2 } from 'lucide-react';
 
 interface TacticalPuzzle {
   id: string;
@@ -152,6 +152,12 @@ export const DailyTacticalPuzzle: React.FC = () => {
     setIsSolved(false);
   };
 
+  const handlePrevPuzzle = () => {
+    setCurrentIndex((prev) => (prev - 1 + CAPABLANCA_PUZZLES.length) % CAPABLANCA_PUZZLES.length);
+    setShowHint(false);
+    setIsSolved(false);
+  };
+
   const handleToggleSolve = () => {
     setIsSolved((prev) => !prev);
   };
@@ -189,11 +195,22 @@ export const DailyTacticalPuzzle: React.FC = () => {
           </span>
           <button
             type="button"
+            onClick={handlePrevPuzzle}
+            className="btn btn--ghost btn--sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+            title="Ver reto táctico anterior"
+          >
+            <ChevronLeft size={14} />
+            <span>Anterior</span>
+          </button>
+          <button
+            type="button"
             onClick={handleNextPuzzle}
             className="btn btn--ghost btn--sm"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+            title="Ver siguiente reto táctico"
           >
-            <span>Siguiente Reto</span>
+            <span>Siguiente</span>
             <ChevronRight size={14} />
           </button>
         </div>
