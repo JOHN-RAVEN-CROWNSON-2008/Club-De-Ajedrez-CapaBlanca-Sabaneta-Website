@@ -21,7 +21,7 @@ import {
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2
+  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2, Archive
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -89,6 +89,7 @@ export const AdminDashboardView: React.FC = () => {
     }
   ]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [messageFilter, setMessageFilter] = useState<'all' | 'unread' | 'read' | 'replied' | 'archived'>('all');
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   // Modales
@@ -1063,6 +1064,33 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Archivo CSV de solicitudes descargado exitosamente');
   };
 
+  // Gestión de Mensajes de Contacto
+  const handleUpdateMessageStatus = async (msgId: string, newStatus: 'unread' | 'read' | 'archived' | 'replied') => {
+    setMessages(messages.map((m) => (m.id === msgId ? { ...m, status: newStatus } : m)));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('contact_messages').update({ status: newStatus }).eq('id', msgId);
+      } catch (err) {
+        console.error('Error al actualizar estado de mensaje en Supabase:', err);
+      }
+    }
+    const label = newStatus === 'read' ? 'marcado como leído' : newStatus === 'replied' ? 'marcado como respondido' : newStatus === 'archived' ? 'archivado' : 'marcado como no leído';
+    triggerNotice(`Mensaje ${label}`);
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!confirm('¿Deseas eliminar definitivamente este mensaje de contacto?')) return;
+    setMessages(messages.filter((m) => m.id !== msgId));
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('contact_messages').delete().eq('id', msgId);
+      } catch (err) {
+        console.error('Error al eliminar mensaje en Supabase:', err);
+      }
+    }
+    triggerNotice('Mensaje de contacto eliminado');
+  };
+
   // Exportar Backup Integral de la Plataforma en JSON
   const handleExportFullJsonBackup = () => {
     const backupData = {
@@ -1194,7 +1222,37 @@ export const AdminDashboardView: React.FC = () => {
               }}
             >
               {item.icon}
-              <span style={{ fontSize: '0.88rem' }}>{item.label}</span>
+              <span style={{ fontSize: '0.88rem', flex: 1 }}>{item.label}</span>
+              {item.id === 'messages' && messages.filter((m) => m.status === 'unread').length > 0 && (
+                <span
+                  style={{
+                    background: activeSection === 'messages' ? '#000' : '#ef4444',
+                    color: activeSection === 'messages' ? 'var(--gold)' : '#fff',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '50px',
+                  }}
+                  title="Mensajes no leídos"
+                >
+                  {messages.filter((m) => m.status === 'unread').length}
+                </span>
+              )}
+              {item.id === 'members' && applications.filter((a) => a.status === 'pending').length > 0 && (
+                <span
+                  style={{
+                    background: activeSection === 'members' ? '#000' : '#f59e0b',
+                    color: activeSection === 'members' ? 'var(--gold)' : '#000',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '50px',
+                  }}
+                  title="Solicitudes de admisión pendientes"
+                >
+                  {applications.filter((a) => a.status === 'pending').length}
+                </span>
+              )}
             </button>
           ))}
         </aside>
@@ -4140,46 +4198,260 @@ export const AdminDashboardView: React.FC = () => {
           {/* 10. SECCIÓN: BANDEJA DE MENSAJES */}
           {activeSection === 'messages' && (
             <div>
-              <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
-                Mensajes de Contacto
-              </h1>
-              <p style={{ color: '#888', marginBottom: '2rem' }}>
-                Consultas recibidas desde el formulario web
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    Bandeja de Mensajes de Contacto
+                  </h1>
+                  <p style={{ color: '#888', margin: '0.3rem 0 0', fontSize: '0.9rem' }}>
+                    Consultas recibidas en tiempo real desde el portal web oficial
+                  </p>
+                </div>
+              </div>
 
+              {/* Filtros por Estado */}
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.2rem' }}>
+                {[
+                  { id: 'all', label: 'Todos los Mensajes', count: messages.length },
+                  { id: 'unread', label: 'No Leídos', count: messages.filter((m) => m.status === 'unread').length },
+                  { id: 'replied', label: 'Respondidos', count: messages.filter((m) => m.status === 'replied').length },
+                  { id: 'read', label: 'Leídos', count: messages.filter((m) => m.status === 'read').length },
+                  { id: 'archived', label: 'Archivados', count: messages.filter((m) => m.status === 'archived').length },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setMessageFilter(f.id as any)}
+                    style={{
+                      background: messageFilter === f.id ? 'var(--gold)' : '#181818',
+                      color: messageFilter === f.id ? '#000' : '#ccc',
+                      border: `1px solid ${messageFilter === f.id ? 'var(--gold)' : '#333'}`,
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '50px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <span>{f.label}</span>
+                    <span
+                      style={{
+                        background: messageFilter === f.id ? '#000' : '#282828',
+                        color: messageFilter === f.id ? 'var(--gold)' : '#aaa',
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: '50px',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      {f.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Buscador de Mensajes */}
+              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                <Search size={18} color="#666" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por remitente, correo, teléfono, asunto o contenido..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem 0.75rem 2.6rem',
+                    borderRadius: '8px',
+                    background: '#141414',
+                    border: '1px solid #333',
+                    color: '#fff',
+                  }}
+                />
+              </div>
+
+              {/* Listado de Mensajes */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {messages.map((msg) => (
-                  <div key={msg.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.8rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--gold)' }}>{msg.subject || 'Sin asunto'}</h3>
-                        <p style={{ color: '#aaa', fontSize: '0.85rem', margin: '0.2rem 0' }}>
-                          De: <strong>{msg.name}</strong> ({msg.email}) · Tel: {msg.phone || 'N/A'}
+                {messages
+                  .filter((msg) => {
+                    if (messageFilter !== 'all' && msg.status !== messageFilter) return false;
+                    const q = searchTerm.toLowerCase();
+                    return (
+                      msg.name.toLowerCase().includes(q) ||
+                      msg.email.toLowerCase().includes(q) ||
+                      (msg.phone || '').includes(q) ||
+                      (msg.subject || '').toLowerCase().includes(q) ||
+                      msg.message.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((msg) => {
+                    const isUnread = msg.status === 'unread';
+                    const isReplied = msg.status === 'replied';
+                    const isArchived = msg.status === 'archived';
+
+                    return (
+                      <div
+                        key={msg.id}
+                        style={{
+                          background: isUnread ? '#16130b' : '#141414',
+                          border: `1px solid ${isUnread ? '#d97706' : '#222'}`,
+                          borderRadius: '12px',
+                          padding: '1.8rem',
+                          transition: 'border-color 0.2s',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '0.8rem' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.3rem' }}>
+                              <h3 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--gold)' }}>
+                                {msg.subject || 'Sin asunto'}
+                              </h3>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '50px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  background:
+                                    msg.status === 'unread' ? 'rgba(239, 68, 68, 0.15)' :
+                                    msg.status === 'replied' ? 'rgba(34, 197, 94, 0.15)' :
+                                    msg.status === 'archived' ? 'rgba(156, 163, 175, 0.15)' :
+                                    'rgba(59, 130, 246, 0.15)',
+                                  color:
+                                    msg.status === 'unread' ? '#f87171' :
+                                    msg.status === 'replied' ? '#4ade80' :
+                                    msg.status === 'archived' ? '#9ca3af' :
+                                    '#60a5fa',
+                                  border: `1px solid ${
+                                    msg.status === 'unread' ? '#b91c1c' :
+                                    msg.status === 'replied' ? '#15803d' :
+                                    msg.status === 'archived' ? '#4b5563' :
+                                    '#1d4ed8'
+                                  }`,
+                                }}
+                              >
+                                {msg.status === 'unread' ? 'No Leído' : msg.status === 'replied' ? 'Respondido' : msg.status === 'archived' ? 'Archivado' : 'Leído'}
+                              </span>
+                            </div>
+                            <p style={{ color: '#aaa', fontSize: '0.85rem', margin: 0 }}>
+                              De: <strong style={{ color: '#fff' }}>{msg.name}</strong> ({msg.email}) · Tel: <strong style={{ color: '#fff' }}>{msg.phone || 'N/A'}</strong>
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {msg.phone && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  whatsappService.openContactReply(msg.phone || '', msg.name, msg.subject || 'Consulta');
+                                  if (msg.status === 'unread') handleUpdateMessageStatus(msg.id, 'replied');
+                                }}
+                                className="btn btn--sm"
+                                style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
+                                title="Responder directamente por WhatsApp y marcar como respondido"
+                              >
+                                <MessageCircle size={13} />
+                                <span>Responder WhatsApp</span>
+                              </button>
+                            )}
+
+                            {/* Marcar leído / no leído */}
+                            {isUnread ? (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMessageStatus(msg.id, 'read')}
+                                className="btn btn--ghost btn--sm"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#3b82f6', color: '#60a5fa' }}
+                                title="Marcar como leído"
+                              >
+                                <Check size={13} />
+                                <span>Marcar Leído</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMessageStatus(msg.id, 'unread')}
+                                className="btn btn--ghost btn--sm"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#444', color: '#888' }}
+                                title="Marcar como no leído"
+                              >
+                                <Mail size={13} />
+                                <span>No leído</span>
+                              </button>
+                            )}
+
+                            {/* Archivar / Desarchivar */}
+                            {isArchived ? (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMessageStatus(msg.id, 'read')}
+                                className="btn btn--ghost btn--sm"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#444', color: '#aaa' }}
+                                title="Restaurar a bandeja principal"
+                              >
+                                <span>Restaurar</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMessageStatus(msg.id, 'archived')}
+                                className="btn btn--ghost btn--sm"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderColor: '#444', color: '#888' }}
+                                title="Archivar mensaje"
+                              >
+                                <Archive size={13} />
+                              </button>
+                            )}
+
+                            {/* Eliminar */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="btn btn--ghost btn--sm"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderColor: '#7f1d1d', color: '#f87171' }}
+                              title="Eliminar mensaje definitivamente"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+
+                            <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '0.3rem' }}>
+                              {new Date(msg.created_at).toLocaleDateString('es-CO')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p style={{ color: '#ddd', fontSize: '0.95rem', lineHeight: 1.6, background: '#1c1c1c', padding: '1rem', borderRadius: '8px', margin: 0 }}>
+                          {msg.message}
                         </p>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        {msg.phone && (
-                          <button
-                            type="button"
-                            onClick={() => whatsappService.openContactReply(msg.phone || '', msg.name, msg.subject || 'Consulta')}
-                            className="btn btn--sm"
-                            style={{ background: '#123018', color: '#81c784', border: '1px solid #2e7d32', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
-                            title="Responder directamente por WhatsApp"
-                          >
-                            <MessageCircle size={13} />
-                            <span>Responder WhatsApp</span>
-                          </button>
-                        )}
-                        <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                          {new Date(msg.created_at).toLocaleDateString('es-CO')}
-                        </span>
-                      </div>
-                    </div>
-                    <p style={{ color: '#ddd', fontSize: '0.95rem', lineHeight: 1.6, background: '#1c1c1c', padding: '1rem', borderRadius: '8px' }}>
-                      {msg.message}
+                    );
+                  })}
+
+                {messages.filter((msg) => {
+                  if (messageFilter !== 'all' && msg.status !== messageFilter) return false;
+                  const q = searchTerm.toLowerCase();
+                  return (
+                    msg.name.toLowerCase().includes(q) ||
+                    msg.email.toLowerCase().includes(q) ||
+                    (msg.phone || '').includes(q) ||
+                    (msg.subject || '').toLowerCase().includes(q) ||
+                    msg.message.toLowerCase().includes(q)
+                  );
+                }).length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#111', border: '1px dashed #333', borderRadius: '12px' }}>
+                    <Mail size={40} color="#555" style={{ margin: '0 auto 1rem' }} />
+                    <h3 style={{ color: '#aaa', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+                      No se encontraron mensajes en esta vista
+                    </h3>
+                    <p style={{ color: '#666', fontSize: '0.85rem', margin: 0 }}>
+                      No hay mensajes que coincidan con el filtro seleccionado ({messageFilter}) o el término de búsqueda.
                     </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}
