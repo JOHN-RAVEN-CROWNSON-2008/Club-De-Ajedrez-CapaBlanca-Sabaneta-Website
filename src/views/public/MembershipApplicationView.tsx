@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { resendService } from '../../services/resendService';
 import { whatsappService } from '../../services/whatsappService';
@@ -36,6 +37,29 @@ export const MembershipApplicationView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [applicationCode, setApplicationCode] = useState('');
+  const [searchParams] = useSearchParams();
+
+  // Pre-cargar categoría si viene desde el cronograma o enlace directo
+  useEffect(() => {
+    const catParam = searchParams.get('categoria');
+    if (catParam) {
+      const options = [
+        'Iniciación Infantil (4 a 8 años)',
+        'Semillero Sub-12',
+        'Desarrollo Juvenil Sub-16',
+        'Adultos & Aficionados',
+        'Alta Competencia Departamental'
+      ];
+      const match = options.find(
+        o => o.toLowerCase().includes(catParam.toLowerCase()) || catParam.toLowerCase().includes(o.toLowerCase())
+      );
+      if (match) {
+        setFormData(prev => ({ ...prev, desired_category: match }));
+      } else {
+        setFormData(prev => ({ ...prev, desired_category: catParam }));
+      }
+    }
+  }, [searchParams]);
 
   // Auto-calcular edad si se selecciona fecha de nacimiento
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {

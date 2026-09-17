@@ -8,6 +8,7 @@ import { ClassSchedule } from '../../types/database';
 export const ProgramsView: React.FC = () => {
   const [schedules, setSchedules] = useState<ClassSchedule[]>(INITIAL_SCHEDULES);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [modalityFilter, setModalityFilter] = useState<'all' | 'Presencial' | 'Online' | 'Híbrida'>('all');
 
   useEffect(() => {
     async function loadSchedules() {
@@ -194,84 +195,129 @@ export const ProgramsView: React.FC = () => {
             </p>
           </div>
 
+          {/* Filtros por Modalidad */}
+          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
+            {[
+              { id: 'all', label: 'Todas las Sesiones', count: schedules.length },
+              { id: 'Presencial', label: 'Presenciales (Sabaneta)', count: schedules.filter(s => s.modality === 'Presencial').length },
+              { id: 'Online', label: 'Virtuales (Zoom / Lichess)', count: schedules.filter(s => s.modality === 'Online').length },
+              { id: 'Híbrida', label: 'Híbridas', count: schedules.filter(s => s.modality === 'Híbrida').length },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setModalityFilter(f.id as any)}
+                style={{
+                  background: modalityFilter === f.id ? 'var(--gold)' : '#181818',
+                  color: modalityFilter === f.id ? '#000' : '#ccc',
+                  border: `1px solid ${modalityFilter === f.id ? 'var(--gold)' : '#333'}`,
+                  padding: '0.45rem 1rem',
+                  borderRadius: '50px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <span>{f.label}</span>
+                <span
+                  style={{
+                    background: modalityFilter === f.id ? '#000' : '#282828',
+                    color: modalityFilter === f.id ? 'var(--gold)' : '#aaa',
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '50px',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  {f.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
           {loadingSchedules ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>
               Cargando cronograma oficial de clases...
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {schedules.map((item) => {
-                const isOnline = item.modality === 'Online';
-                const isHibrida = item.modality === 'Híbrida';
-                const badgeBg = isOnline ? 'rgba(59, 130, 246, 0.15)' : isHibrida ? 'rgba(168, 85, 247, 0.15)' : 'rgba(245, 197, 24, 0.15)';
-                const badgeColor = isOnline ? '#60a5fa' : isHibrida ? '#c084fc' : 'var(--gold)';
-                const badgeBorder = isOnline ? '#2563eb' : isHibrida ? '#9333ea' : 'var(--gold)';
+              {schedules
+                .filter(item => modalityFilter === 'all' || item.modality === modalityFilter)
+                .map((item) => {
+                  const isOnline = item.modality === 'Online';
+                  const isHibrida = item.modality === 'Híbrida';
+                  const badgeBg = isOnline ? 'rgba(59, 130, 246, 0.15)' : isHibrida ? 'rgba(168, 85, 247, 0.15)' : 'rgba(245, 197, 24, 0.15)';
+                  const badgeColor = isOnline ? '#60a5fa' : isHibrida ? '#c084fc' : 'var(--gold)';
+                  const badgeBorder = isOnline ? '#2563eb' : isHibrida ? '#9333ea' : 'var(--gold)';
 
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      background: '#141414',
-                      border: '1px solid #282828',
-                      borderRadius: '14px',
-                      padding: '1.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'border-color 0.2s, transform 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-3px)';
-                      e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.4)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = '#282828';
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.75rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: 800, textTransform: 'uppercase' }}>
-                          {item.modality}
-                        </span>
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        background: '#141414',
+                        border: '1px solid #282828',
+                        borderRadius: '14px',
+                        padding: '1.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'border-color 0.2s, transform 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                        e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.borderColor = '#282828';
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                          <span style={{ fontSize: '0.75rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: 800, textTransform: 'uppercase' }}>
+                            {item.modality}
+                          </span>
+                        </div>
+                        <h3 style={{ fontSize: '1.18rem', color: '#fff', margin: '0.4rem 0 0.5rem', fontWeight: 700 }}>
+                          {item.category}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--gold)', fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.4rem' }}>
+                          <Clock size={15} style={{ flexShrink: 0 }} />
+                          <span>{item.day_of_week} · {item.time_range}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#bbb', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                          <GraduationCap size={15} style={{ flexShrink: 0, color: 'var(--gold)' }} />
+                          <span>{item.trainer || 'Entrenador Titulado'}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#777', fontSize: '0.82rem' }}>
+                          <MapPin size={15} style={{ flexShrink: 0 }} />
+                          <span>{item.location}</span>
+                        </div>
                       </div>
-                      <h3 style={{ fontSize: '1.18rem', color: '#fff', margin: '0.4rem 0 0.5rem', fontWeight: 700 }}>
-                        {item.category}
-                      </h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--gold)', fontWeight: 600, fontSize: '0.92rem', marginBottom: '0.4rem' }}>
-                        <Clock size={15} style={{ flexShrink: 0 }} />
-                        <span>{item.day_of_week} · {item.time_range}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#bbb', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-                        <GraduationCap size={15} style={{ flexShrink: 0, color: 'var(--gold)' }} />
-                        <span>{item.trainer || 'Entrenador Titulado'}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#777', fontSize: '0.82rem' }}>
-                        <MapPin size={15} style={{ flexShrink: 0 }} />
-                        <span>{item.location}</span>
+
+                      <div style={{ marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid #222' }}>
+                        <Link
+                          to={`/afiliarse?categoria=${encodeURIComponent(item.category)}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            color: 'var(--gold)',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <span>Postularse a este horario</span>
+                          <ArrowRight size={14} />
+                        </Link>
                       </div>
                     </div>
-
-                    <div style={{ marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid #222' }}>
-                      <Link
-                        to="/afiliarse"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          color: 'var(--gold)',
-                          fontSize: '0.82rem',
-                          fontWeight: 700,
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <span>Postularse a este horario</span>
-                        <ArrowRight size={14} />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </div>
