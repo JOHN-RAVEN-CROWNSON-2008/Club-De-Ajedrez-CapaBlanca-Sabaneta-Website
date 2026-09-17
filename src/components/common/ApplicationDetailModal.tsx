@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   X, Printer, MessageCircle, UserX, UserCheck, ShieldCheck,
   Calendar, User
@@ -33,8 +33,8 @@ export const ApplicationDetailModal: React.FC<ApplicationDetailModalProps> = ({
   if (!isOpen) return null;
 
   const fullName = `${application.applicant_name} ${application.applicant_lastname}`.trim();
-  const radicadoMatch = (application.notes || '').match(/SOL-CAPA-\d+-2026/);
-  const radicadoCode = radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${application.id.slice(0, 6).toUpperCase()}-2026`;
+  const radicadoMatch = (application.notes || '').match(/SOL-CAPA-[A-Z0-9-]+/);
+  const radicadoCode = radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${application.doc_number?.slice(-6) || application.id.slice(0, 6).toUpperCase()}-2026`;
 
   const handlePrint = () => {
     window.print();

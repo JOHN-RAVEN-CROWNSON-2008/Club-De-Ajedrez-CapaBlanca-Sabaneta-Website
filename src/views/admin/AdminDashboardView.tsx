@@ -3243,6 +3243,8 @@ export const AdminDashboardView: React.FC = () => {
                           .filter((app) => {
                             if (applicationFilter !== 'all' && app.status !== applicationFilter) return false;
                             const search = searchTerm.toLowerCase();
+                            const radicadoMatch = (app.notes || '').match(/SOL-CAPA-[A-Z0-9-]+/);
+                            const radicadoCode = (radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${app.doc_number?.slice(-6) || app.id.slice(0, 6).toUpperCase()}-2026`).toLowerCase();
                             return (
                               app.applicant_name.toLowerCase().includes(search) ||
                               app.applicant_lastname.toLowerCase().includes(search) ||
@@ -3250,13 +3252,14 @@ export const AdminDashboardView: React.FC = () => {
                               app.email.toLowerCase().includes(search) ||
                               app.desired_category.toLowerCase().includes(search) ||
                               (app.municipality || '').toLowerCase().includes(search) ||
-                              (app.notes || '').toLowerCase().includes(search)
+                              (app.notes || '').toLowerCase().includes(search) ||
+                              radicadoCode.includes(search)
                             );
                           })
                           .map((app) => {
                             const fullName = `${app.applicant_name} ${app.applicant_lastname}`.trim();
-                            const radicadoMatch = (app.notes || '').match(/SOL-CAPA-\d+-2026/);
-                            const radicadoCode = radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${app.id.slice(0, 6).toUpperCase()}-2026`;
+                            const radicadoMatch = (app.notes || '').match(/SOL-CAPA-[A-Z0-9-]+/);
+                            const radicadoCode = radicadoMatch ? radicadoMatch[0] : `SOL-CAPA-${app.doc_number?.slice(-6) || app.id.slice(0, 6).toUpperCase()}-2026`;
 
                             return (
                               <tr key={app.id} style={{ borderBottom: '1px solid #222' }}>
