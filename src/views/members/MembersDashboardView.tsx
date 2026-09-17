@@ -276,7 +276,16 @@ export const MembersDashboardView: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <Link
+              to="/reloj"
+              className="btn btn--ghost btn--sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid #333' }}
+              title="Abrir Reloj Oficial de Ajedrez con ritmos FIDE y atajos"
+            >
+              <Clock size={15} color="var(--gold)" />
+              <span>Reloj Digital</span>
+            </Link>
             <Link to="/" className="btn btn--ghost btn--sm">
               Ver Web Principal
             </Link>
@@ -324,7 +333,7 @@ export const MembersDashboardView: React.FC = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Trophy size={16} />
-            <span>Inscripción a Torneos</span>
+            <span>Inscripción a Torneos ({events.length})</span>
           </button>
 
           <button
@@ -334,7 +343,7 @@ export const MembersDashboardView: React.FC = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <CreditCard size={16} />
-            <span>Mis Cuotas & Pagos</span>
+            <span>Mis Cuotas & Pagos ({payments.length})</span>
           </button>
 
           <button
@@ -344,7 +353,7 @@ export const MembersDashboardView: React.FC = () => {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Clock size={16} />
-            <span>Horarios de Clase</span>
+            <span>Horarios de Clase ({schedules.length})</span>
           </button>
 
           <button
