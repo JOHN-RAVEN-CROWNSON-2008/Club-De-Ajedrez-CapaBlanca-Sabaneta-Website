@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown, Search, ShieldCheck } from 'lucide-react';
+import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown, Search, ShieldCheck, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_MEMBERS, INITIAL_TROPHIES } from '../../lib/initialData';
 import { UserProfile, ClubTrophy } from '../../types/database';
@@ -11,6 +11,7 @@ export const ClubView: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [rankingSearch, setRankingSearch] = useState<string>('');
   const [trophyYearFilter, setTrophyYearFilter] = useState<string>('all');
+  const [trophySearch, setTrophySearch] = useState<string>('');
 
   useEffect(() => {
     async function loadClubData() {
@@ -51,6 +52,89 @@ export const ClubView: React.FC = () => {
 
     loadClubData();
   }, []);
+
+  // Escalafón Oficial
+  const activeMembers = useMemo(() => {
+    return members.filter((m) => m.role !== 'admin' || m.elo_rating);
+  }, [members]);
+
+  const memberCategoryCounts = useMemo(() => {
+    return {
+      all: activeMembers.length,
+      Infantil: activeMembers.filter((m) => {
+        const cat = (m.categoria_ajedrez || '').toLowerCase();
+        return cat.includes('infantil') || cat.includes('sub-12');
+      }).length,
+      Juvenil: activeMembers.filter((m) => {
+        const cat = (m.categoria_ajedrez || '').toLowerCase();
+        return cat.includes('juvenil') || cat.includes('sub-16') || cat.includes('sub-18');
+      }).length,
+      Adultos: activeMembers.filter((m) => {
+        const cat = (m.categoria_ajedrez || '').toLowerCase();
+        return cat.includes('adulto');
+      }).length,
+      Maestros: activeMembers.filter((m) => {
+        const cat = (m.categoria_ajedrez || '').toLowerCase();
+        return cat.includes('maestro') || (m.elo_rating || 0) >= 2000;
+      }).length,
+    };
+  }, [activeMembers]);
+
+  const filteredMembers = useMemo(() => {
+    return activeMembers
+      .filter((m) => {
+        if (categoryFilter === 'all') return true;
+        const cat = (m.categoria_ajedrez || '').toLowerCase();
+        if (categoryFilter === 'Infantil') return cat.includes('infantil') || cat.includes('sub-12');
+        if (categoryFilter === 'Juvenil') return cat.includes('juvenil') || cat.includes('sub-16') || cat.includes('sub-18');
+        if (categoryFilter === 'Adultos') return cat.includes('adulto');
+        if (categoryFilter === 'Maestros') return cat.includes('maestro') || (m.elo_rating || 0) >= 2000;
+        return true;
+      })
+      .filter((m) => {
+        if (!rankingSearch.trim()) return true;
+        const q = rankingSearch.toLowerCase();
+        const fullName = `${m.nombre || ''} ${m.apellido || ''}`.toLowerCase();
+        const username = (m.usuario || '').toLowerCase();
+        const city = (m.ciudad || '').toLowerCase();
+        const fide = (m.fide_id || '').toLowerCase();
+        return fullName.includes(q) || username.includes(q) || city.includes(q) || fide.includes(q);
+      })
+      .sort((a, b) => (b.elo_rating || 0) - (a.elo_rating || 0));
+  }, [activeMembers, categoryFilter, rankingSearch]);
+
+  // Palmarés Deportivo
+  const trophyYears = useMemo(() => {
+    const years = Array.from(new Set(trophies.map((t) => t.year.toString()))).sort((a, b) => Number(b) - Number(a));
+    return ['all', ...years];
+  }, [trophies]);
+
+  const trophyYearCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: trophies.length };
+    trophies.forEach((t) => {
+      const yr = t.year.toString();
+      counts[yr] = (counts[yr] || 0) + 1;
+    });
+    return counts;
+  }, [trophies]);
+
+  const filteredTrophies = useMemo(() => {
+    return trophies.filter((t) => {
+      const matchYear = trophyYearFilter === 'all' || t.year.toString() === trophyYearFilter;
+      const q = trophySearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.champion_name && t.champion_name.toLowerCase().includes(q)) ||
+        (t.runner_up && t.runner_up.toLowerCase().includes(q)) ||
+        (t.category && t.category.toLowerCase().includes(q)) ||
+        (t.location && t.location.toLowerCase().includes(q)) ||
+        (t.notes && t.notes.toLowerCase().includes(q));
+
+      return matchYear && matchSearch;
+    });
+  }, [trophies, trophyYearFilter, trophySearch]);
+
   return (
     <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
       {/* Cabecera de Sección */}
@@ -195,28 +279,32 @@ export const ClubView: React.FC = () => {
               )}
             </div>
 
-            {/* Filtros de Categoría */}
+            {/* Filtros de Categoría con conteo */}
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              {['all', 'Infantil', 'Juvenil', 'Adultos', 'Maestros'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategoryFilter(cat)}
-                  style={{
-                    padding: '0.4rem 0.9rem',
-                    borderRadius: '20px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    background: categoryFilter === cat ? 'var(--gold)' : '#1a1a1a',
-                    color: categoryFilter === cat ? '#000' : '#bbb',
-                    border: '1px solid #333',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {cat === 'all' ? 'Todo el Escalafón' : cat}
-                </button>
-              ))}
+              {(['all', 'Infantil', 'Juvenil', 'Adultos', 'Maestros'] as const).map((cat) => {
+                const count = memberCategoryCounts[cat] || 0;
+                const label = cat === 'all' ? 'Todo el Escalafón' : cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    style={{
+                      padding: '0.4rem 0.9rem',
+                      borderRadius: '20px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      background: categoryFilter === cat ? 'var(--gold)' : '#1a1a1a',
+                      color: categoryFilter === cat ? '#000' : '#bbb',
+                      border: categoryFilter === cat ? '1px solid var(--gold)' : '1px solid #333',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {label} ({count})
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -235,38 +323,41 @@ export const ClubView: React.FC = () => {
               </thead>
               <tbody>
                 {(() => {
-                  const sorted = [...members]
-                    .filter((m) => m.role !== 'admin' || m.elo_rating)
-                    .filter((m) => {
-                      if (categoryFilter === 'all') return true;
-                      if (categoryFilter === 'Infantil') return (m.categoria_ajedrez || '').toLowerCase().includes('infantil') || (m.categoria_ajedrez || '').toLowerCase().includes('sub-12');
-                      if (categoryFilter === 'Juvenil') return (m.categoria_ajedrez || '').toLowerCase().includes('juvenil') || (m.categoria_ajedrez || '').toLowerCase().includes('sub-16') || (m.categoria_ajedrez || '').toLowerCase().includes('sub-18');
-                      if (categoryFilter === 'Adultos') return (m.categoria_ajedrez || '').toLowerCase().includes('adulto');
-                      if (categoryFilter === 'Maestros') return (m.categoria_ajedrez || '').toLowerCase().includes('maestro') || (m.elo_rating || 0) >= 2000;
-                      return true;
-                    })
-                    .filter((m) => {
-                      if (!rankingSearch.trim()) return true;
-                      const q = rankingSearch.toLowerCase();
-                      const fullName = `${m.nombre || ''} ${m.apellido || ''}`.toLowerCase();
-                      const username = (m.usuario || '').toLowerCase();
-                      const city = (m.ciudad || '').toLowerCase();
-                      const fide = (m.fide_id || '').toLowerCase();
-                      return fullName.includes(q) || username.includes(q) || city.includes(q) || fide.includes(q);
-                    })
-                    .sort((a, b) => (b.elo_rating || 0) - (a.elo_rating || 0));
-
-                  if (sorted.length === 0) {
+                  if (filteredMembers.length === 0) {
                     return (
                       <tr>
-                        <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#777' }}>
-                          No se encontraron deportistas con el criterio seleccionado.
+                        <td colSpan={6} style={{ padding: '3rem 1.5rem', textAlign: 'center', color: '#888' }}>
+                          <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#aaa' }}>
+                            {rankingSearch
+                              ? `No se encontraron ajedrecistas para "${rankingSearch}".`
+                              : 'No hay deportistas registrados en esta categoría.'}
+                          </p>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1.2rem' }}>
+                            {rankingSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setRankingSearch('')}
+                                className="btn btn--sm btn--secondary"
+                              >
+                                Limpiar búsqueda
+                              </button>
+                            )}
+                            {categoryFilter !== 'all' && (
+                              <button
+                                type="button"
+                                onClick={() => setCategoryFilter('all')}
+                                className="btn btn--sm btn--secondary"
+                              >
+                                Ver todo el escalafón
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
                   }
 
-                  return sorted.map((player, index) => {
+                  return filteredMembers.map((player, index) => {
                     const pos = index + 1;
                     const medalColor = pos === 1 ? '#ffd700' : pos === 2 ? '#c0c0c0' : pos === 3 ? '#cd7f32' : null;
 
@@ -371,49 +462,120 @@ export const ClubView: React.FC = () => {
             </p>
           </div>
 
-          {/* Filtros de Palmarés */}
+          {/* Barra de Búsqueda de Palmarés */}
+          <div style={{ maxWidth: '480px', margin: '0 auto 1.5rem', position: 'relative' }}>
+            <Search
+              size={18}
+              style={{
+                position: 'absolute',
+                left: '1.1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--gold)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Buscar campeón, subcampeón o título..."
+              value={trophySearch}
+              onChange={(e) => setTrophySearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem 2.8rem 0.75rem 2.8rem',
+                borderRadius: '30px',
+                background: '#161616',
+                border: '1px solid #333',
+                color: '#fff',
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'var(--gold)';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(245, 197, 24, 0.25)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#333';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+            {trophySearch && (
+              <button
+                type="button"
+                onClick={() => setTrophySearch('')}
+                style={{
+                  position: 'absolute',
+                  right: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#888',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Limpiar búsqueda"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Filtros de Palmarés por Temporada con conteo */}
           <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-            <button
-              type="button"
-              className={`btn btn--sm ${trophyYearFilter === 'all' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setTrophyYearFilter('all')}
-            >
-              Todos los Títulos ({trophies.length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn--sm ${trophyYearFilter === '2025' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setTrophyYearFilter('2025')}
-            >
-              Temporada 2025
-            </button>
-            <button
-              type="button"
-              className={`btn btn--sm ${trophyYearFilter === '2024' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setTrophyYearFilter('2024')}
-            >
-              Temporada 2024
-            </button>
-            <button
-              type="button"
-              className={`btn btn--sm ${trophyYearFilter === '2023' ? 'btn--primary' : 'btn--ghost'}`}
-              onClick={() => setTrophyYearFilter('2023')}
-            >
-              Temporada 2023
-            </button>
+            {trophyYears.map((yr) => {
+              const count = trophyYearCounts[yr] || 0;
+              const label = yr === 'all' ? 'Todos los Títulos' : `Temporada ${yr}`;
+              return (
+                <button
+                  key={yr}
+                  type="button"
+                  className={`btn btn--sm ${trophyYearFilter === yr ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setTrophyYearFilter(yr)}
+                >
+                  {label} ({count})
+                </button>
+              );
+            })}
           </div>
 
           {/* Grid de Trofeos y Campeones */}
           {(() => {
-            const filteredTrophies = trophies.filter((t) => {
-              if (trophyYearFilter === 'all') return true;
-              return t.year.toString() === trophyYearFilter;
-            });
-
             if (filteredTrophies.length === 0) {
               return (
-                <div style={{ textAlign: 'center', padding: '3rem', background: '#121212', borderRadius: '12px', border: '1px solid #222' }}>
-                  <p style={{ color: '#888' }}>No hay registros de campeonatos en este periodo.</p>
+                <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#121212', borderRadius: '14px', border: '1px solid #222', maxWidth: '520px', margin: '0 auto' }}>
+                  <Trophy size={40} style={{ color: 'var(--gold)', margin: '0 auto 1rem', opacity: 0.6 }} />
+                  <h3 style={{ fontSize: '1.15rem', color: '#fff', marginBottom: '0.5rem' }}>
+                    {trophySearch ? 'No se encontraron campeonatos' : 'Sin registros en este periodo'}
+                  </h3>
+                  <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.2rem' }}>
+                    {trophySearch
+                      ? `No hay títulos o campeones que coincidan con "${trophySearch}".`
+                      : 'No hay títulos registrados para la temporada seleccionada.'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    {trophySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setTrophySearch('')}
+                        className="btn btn--sm btn--secondary"
+                      >
+                        Limpiar búsqueda
+                      </button>
+                    )}
+                    {trophyYearFilter !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setTrophyYearFilter('all')}
+                        className="btn btn--sm btn--secondary"
+                      >
+                        Ver todos los títulos
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             }

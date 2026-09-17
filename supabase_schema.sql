@@ -636,6 +636,3 @@ CREATE POLICY "receipts_owner_or_admin_select" ON storage.objects FOR SELECT
 DROP POLICY IF EXISTS "receipts_admin_delete" ON storage.objects;
 CREATE POLICY "receipts_admin_delete" ON storage.objects FOR DELETE
     USING (bucket_id = 'payment-receipts' AND public.is_admin());
-
-
-
