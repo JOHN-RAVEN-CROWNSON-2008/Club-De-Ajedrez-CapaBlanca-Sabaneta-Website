@@ -3,13 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { FileUploadField } from '../../components/common/FileUploadField';
-import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE, INITIAL_REGISTRATIONS } from '../../lib/initialData';
-import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance, TournamentRegistration } from '../../types/database';
+import { INITIAL_DOCUMENTS, INITIAL_EVENTS, INITIAL_PAYMENTS, INITIAL_SCHEDULES, INITIAL_MATCHES, INITIAL_ATTENDANCE, INITIAL_REGISTRATIONS, INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
+import { ClubDocument, ClubEvent, MembershipPayment, ClassSchedule, TournamentMatch, ClassAttendance, TournamentRegistration, ClubAnnouncement } from '../../types/database';
 import { resendService } from '../../services/resendService';
 import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
-  Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users
+  Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users,
+  Megaphone, X
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -60,6 +61,9 @@ export const MembersDashboardView: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
+  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(
+    INITIAL_ANNOUNCEMENTS.find((a) => a.active && (a.target === 'all' || a.target === 'members')) || null
+  );
   const [paymentForm, setPaymentForm] = useState({
     amount: 120000,
     payment_method: 'Bancolombia' as const,
@@ -98,6 +102,15 @@ export const MembersDashboardView: React.FC = () => {
       }
 
       try {
+        const { data: annData } = await supabase
+          .from('club_announcements')
+          .select('*')
+          .eq('active', true)
+          .in('target', ['all', 'members'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (annData && annData.length > 0) setActiveBanner(annData[0] as ClubAnnouncement);
+
         const { data: docData } = await supabase.from('documents').select('*');
         if (docData && docData.length > 0) setDocuments(docData as ClubDocument[]);
 
@@ -307,6 +320,44 @@ export const MembersDashboardView: React.FC = () => {
           <div style={{ background: '#1b3a24', border: '1px solid #4caf50', color: '#a5d6a7', padding: '0.8rem 1.2rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <CheckCircle2 size={18} />
             <span>{notice}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Anuncio Prioritario para Afiliados */}
+      {activeBanner && activeBanner.active && (
+        <div className="wrap" style={{ marginTop: '1rem' }}>
+          <div
+            style={{
+              background: activeBanner.level === 'urgent' ? '#450a0a' : activeBanner.level === 'warning' ? '#451a03' : '#141414',
+              border: `1px solid ${activeBanner.level === 'urgent' ? '#dc2626' : activeBanner.level === 'warning' ? '#d97706' : 'var(--gold)'}`,
+              borderRadius: '8px',
+              padding: '0.85rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              color: '#fff',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1 }}>
+              <Megaphone size={20} color={activeBanner.level === 'urgent' ? '#f87171' : activeBanner.level === 'warning' ? '#fbbf24' : 'var(--gold)'} />
+              <div>
+                <strong style={{ color: activeBanner.level === 'urgent' ? '#fca5a5' : activeBanner.level === 'warning' ? '#fde68a' : 'var(--gold)' }}>
+                  {activeBanner.title}:
+                </strong>{' '}
+                <span style={{ fontSize: '0.9rem', color: '#e5e5e5' }}>{activeBanner.message}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveBanner(null)}
+              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '0.25rem', display: 'inline-flex', alignItems: 'center' }}
+              aria-label="Cerrar aviso"
+              title="Descartar aviso"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}

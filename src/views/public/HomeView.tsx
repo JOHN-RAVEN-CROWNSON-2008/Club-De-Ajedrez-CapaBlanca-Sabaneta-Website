@@ -13,7 +13,9 @@ import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, Hel
 export const HomeView: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>(INITIAL_EVENTS.slice(0, 2));
   const [latestPosts, setLatestPosts] = useState<Post[]>(INITIAL_POSTS.slice(0, 2));
-  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(INITIAL_ANNOUNCEMENTS[0] || null);
+  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(
+    INITIAL_ANNOUNCEMENTS.find((a) => a.active && (a.target === 'all' || a.target === 'public')) || null
+  );
 
   useEffect(() => {
     async function loadHomeData() {
@@ -38,6 +40,7 @@ export const HomeView: React.FC = () => {
           .from('club_announcements')
           .select('*')
           .eq('active', true)
+          .in('target', ['all', 'public'])
           .order('created_at', { ascending: false })
           .limit(1);
         if (annData && annData.length > 0) setActiveBanner(annData[0] as ClubAnnouncement);

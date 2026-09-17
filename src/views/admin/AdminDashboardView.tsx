@@ -842,6 +842,48 @@ export const AdminDashboardView: React.FC = () => {
     triggerNotice('Anuncio de alerta activado');
   };
 
+  // Alternar estado activo / inactivo de anuncio
+  const handleToggleAnnouncementActive = async (id: string, currentActive: boolean) => {
+    const updatedActive = !currentActive;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('club_announcements').update({ active: updatedActive }).eq('id', id);
+      } catch (err) {
+        console.error('Error al actualizar estado del anuncio en Supabase:', err);
+      }
+    }
+    setAnnouncements(announcements.map((a) => (a.id === id ? { ...a, active: updatedActive } : a)));
+    triggerNotice(`Aviso ${updatedActive ? 'activado (visible)' : 'pausado (inactivo)'}`);
+  };
+
+  // Cambiar audiencia destino del anuncio
+  const handleUpdateAnnouncementTarget = async (id: string, newTarget: 'all' | 'members' | 'public') => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('club_announcements').update({ target: newTarget }).eq('id', id);
+      } catch (err) {
+        console.error('Error al actualizar audiencia del anuncio en Supabase:', err);
+      }
+    }
+    setAnnouncements(announcements.map((a) => (a.id === id ? { ...a, target: newTarget } : a)));
+    const targetLabel = newTarget === 'all' ? 'Todo público y afiliados' : newTarget === 'members' ? 'Solo afiliados' : 'Solo visitantes públicos';
+    triggerNotice(`Audiencia del aviso actualizada a: ${targetLabel}`);
+  };
+
+  // Eliminar anuncio prioritario
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm('¿Deseas eliminar definitivamente este aviso del club?')) return;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('club_announcements').delete().eq('id', id);
+      } catch (err) {
+        console.error('Error al eliminar aviso en Supabase:', err);
+      }
+    }
+    setAnnouncements(announcements.filter((a) => a.id !== id));
+    triggerNotice('Aviso eliminado exitosamente');
+  };
+
   // Ver comprobante de pago (bucket privado, requiere URL firmada temporal)
   const handleViewReceipt = async (receiptPath: string) => {
     const url = await getSignedUrl('payment-receipts', receiptPath);
@@ -913,14 +955,63 @@ export const AdminDashboardView: React.FC = () => {
   };
 
   const handleApproveApplication = async (app: MembershipApplication) => {
-    // Nota de arquitectura: `profiles.id` es una llave foránea hacia `auth.users(id)`,
-    // así que un perfil solo puede crearse cuando existe una cuenta real de autenticación.
-    // Por eso "aprobar" solo cambia el estado de la solicitud; la cuenta de acceso del
-    // afiliado se crea cuando esa persona se registra en el portal de Afiliados con el
-    // mismo correo (el trigger `handle_new_user` crea el perfil automáticamente).
+    // 1. Actualizar estado de solicitud a aprobada
     await handleUpdateApplicationStatus(app.id, 'approved');
+
+    // 2. Incorporar de inmediato a la nómina de afiliados del club
+    const existingIndex = members.findIndex((m) => m.correo?.toLowerCase() === app.email?.toLowerCase());
+    if (existingIndex === -1) {
+      const newMember: UserProfile = {
+        id: `usr-${app.doc_number || crypto.randomUUID().slice(0, 8)}`,
+        nombre: app.applicant_name,
+        apellido: app.applicant_lastname,
+        usuario: `${app.applicant_name.toLowerCase().replace(/[^a-z0-9]/g, '')}${app.doc_number ? app.doc_number.slice(-4) : '2026'}`,
+        correo: app.email,
+        telefono: app.phone,
+        ciudad: app.municipality || 'Sabaneta',
+        doc_type: app.doc_type,
+        doc_number: app.doc_number,
+        municipio: app.municipality || 'Sabaneta',
+        role: 'member',
+        categoria_ajedrez: app.desired_category || 'Iniciación',
+        elo_rating: app.approximate_elo || 1200,
+        estado: 'active',
+        created_at: new Date().toISOString(),
+      };
+      setMembers((prev) => [newMember, ...prev]);
+    } else {
+      setMembers((prev) =>
+        prev.map((m, idx) =>
+          idx === existingIndex
+            ? {
+                ...m,
+                estado: 'active',
+                categoria_ajedrez: app.desired_category || m.categoria_ajedrez,
+                elo_rating: app.approximate_elo || m.elo_rating || 1200,
+              }
+            : m
+        )
+      );
+    }
+
+    // 3. Sincronizar con Supabase si ya existe el registro de perfil
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            estado: 'active',
+            categoria_ajedrez: app.desired_category || 'Iniciación',
+            elo_rating: app.approximate_elo || 1200,
+          })
+          .eq('correo', app.email);
+      } catch (err) {
+        console.warn('Sincronización de perfil al aprobar solicitud en Supabase:', err);
+      }
+    }
+
     triggerNotice(
-      `Solicitud de ${app.applicant_name} aprobada. Pide al afiliado registrarse en el Portal de Afiliados con el correo ${app.email} para activar su acceso.`
+      `✓ Solicitud de ${app.applicant_name} aprobada e incorporada a la nómina oficial de afiliados (Categoría: ${app.desired_category || 'Iniciación'}, Elo: ${app.approximate_elo || 1200}). Puedes emitir su carnet o certificado de inmediato.`
     );
   };
 
@@ -3908,30 +3999,129 @@ export const AdminDashboardView: React.FC = () => {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {announcements.map((ann) => (
-                  <div
-                    key={ann.id}
-                    style={{
-                      background: '#141414',
-                      borderLeft: `4px solid ${ann.level === 'urgent' ? '#d32f2f' : ann.level === 'warning' ? '#f57c00' : 'var(--gold)'}`,
-                      borderTop: '1px solid #222',
-                      borderRight: '1px solid #222',
-                      borderBottom: '1px solid #222',
-                      borderRadius: '8px',
-                      padding: '1.5rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h3 style={{ fontSize: '1.15rem', color: '#fff', margin: 0 }}>{ann.title}</h3>
-                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#888' }}>
-                        Destino: {ann.target}
-                      </span>
+                {announcements.map((ann) => {
+                  const levelColor = ann.level === 'urgent' ? '#ef4444' : ann.level === 'warning' ? '#f59e0b' : 'var(--gold)';
+                  const levelLabel = ann.level === 'urgent' ? 'Urgente (Rojo)' : ann.level === 'warning' ? 'Advertencia (Ámbar)' : 'Informativo (Oro)';
+                  return (
+                    <div
+                      key={ann.id}
+                      style={{
+                        background: '#141414',
+                        borderLeft: `5px solid ${levelColor}`,
+                        borderTop: '1px solid #242424',
+                        borderRight: '1px solid #242424',
+                        borderBottom: '1px solid #242424',
+                        borderRadius: '10px',
+                        padding: '1.5rem',
+                        opacity: ann.active ? 1 : 0.65,
+                        transition: 'opacity 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                            <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, fontWeight: 700 }}>{ann.title}</h3>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                background: `${levelColor}22`,
+                                color: levelColor,
+                                border: `1px solid ${levelColor}44`,
+                              }}
+                            >
+                              {levelLabel}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                background: ann.active ? '#14532d' : '#262626',
+                                color: ann.active ? '#4ade80' : '#888',
+                                border: `1px solid ${ann.active ? '#22c55e' : '#444'}`,
+                              }}
+                            >
+                              {ann.active ? '● En Vivo' : '○ Pausado'}
+                            </span>
+                          </div>
+                          <p style={{ color: '#ccc', fontSize: '0.95rem', margin: '0.6rem 0', lineHeight: 1.6 }}>
+                            {ann.message}
+                          </p>
+                          <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem' }}>
+                            Publicado: {new Date(ann.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </div>
+                        </div>
+
+                        {/* Controles de Estado y Audiencia */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAnnouncementActive(ann.id, ann.active)}
+                              className="btn btn--sm"
+                              style={{
+                                background: ann.active ? '#1b3a24' : '#222',
+                                color: ann.active ? '#86efac' : '#aaa',
+                                border: `1px solid ${ann.active ? '#22c55e' : '#444'}`,
+                                fontSize: '0.75rem',
+                                padding: '0.3rem 0.65rem',
+                              }}
+                              title={ann.active ? 'Pausar este aviso para que no aparezca en las páginas' : 'Activar este aviso para mostrarlo'}
+                            >
+                              {ann.active ? 'Pausar Aviso' : 'Activar en Vivo'}
+                            </button>
+
+                            <select
+                              value={ann.target}
+                              onChange={(e) => handleUpdateAnnouncementTarget(ann.id, e.target.value as any)}
+                              style={{
+                                background: '#1c1c1c',
+                                color: 'var(--gold)',
+                                border: '1px solid #3a3a3a',
+                                borderRadius: '4px',
+                                padding: '0.3rem 0.6rem',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                              }}
+                              title="Cambiar la audiencia a la que va dirigida este aviso"
+                            >
+                              <option value="all">Todo público y afiliados</option>
+                              <option value="members">Solo afiliados</option>
+                              <option value="public">Solo visitantes públicos</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAnnouncement(ann.id)}
+                              className="btn btn--ghost btn--sm"
+                              style={{
+                                borderColor: '#7f1d1d',
+                                color: '#f87171',
+                                padding: '0.3rem 0.55rem',
+                                fontSize: '0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                              }}
+                              title="Eliminar este aviso definitivamente"
+                            >
+                              <Trash2 size={13} />
+                              <span>Eliminar</span>
+                            </button>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#888' }}>
+                            Audiencia actual: <strong style={{ color: '#fff' }}>{ann.target === 'all' ? 'Todo Público' : ann.target === 'members' ? 'Afiliados' : 'Web Pública'}</strong>
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <p style={{ color: '#ccc', fontSize: '0.95rem', margin: '0.5rem 0 0', lineHeight: 1.5 }}>
-                      {ann.message}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
