@@ -1134,9 +1134,17 @@ export const AdminDashboardView: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" target="_blank" className="btn btn--ghost btn--sm">
-            Ver Web en vivo
-          </Link>
+          <a
+            href={window.location.port === '5181' ? 'http://localhost:5180' : '/'}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="btn btn--ghost btn--sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid #333' }}
+            title="Abrir la página web pública del club en una nueva pestaña"
+          >
+            <Globe size={14} color="var(--gold)" />
+            <span>Ver Web en vivo</span>
+          </a>
           <button
             onClick={() => logout().then(() => navigate('/admin/login'))}
             className="btn btn--sm"

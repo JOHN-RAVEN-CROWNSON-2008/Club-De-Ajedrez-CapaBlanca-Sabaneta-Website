@@ -10,7 +10,7 @@ import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
   Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users,
-  Megaphone, X
+  Megaphone, X, Globe
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -299,9 +299,15 @@ export const MembersDashboardView: React.FC = () => {
               <Clock size={15} color="var(--gold)" />
               <span>Reloj Digital</span>
             </Link>
-            <Link to="/" className="btn btn--ghost btn--sm">
-              Ver Web Principal
-            </Link>
+            <a
+              href={window.location.port === '5182' ? 'http://localhost:5180' : '/'}
+              className="btn btn--ghost btn--sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid #333' }}
+              title="Volver al portal público del club"
+            >
+              <Globe size={14} color="var(--gold)" />
+              <span>Ver Web Principal</span>
+            </a>
             <button
               onClick={() => logout().then(() => navigate('/'))}
               className="btn btn--sm"

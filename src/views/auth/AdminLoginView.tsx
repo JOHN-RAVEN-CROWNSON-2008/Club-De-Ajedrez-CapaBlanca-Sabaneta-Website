@@ -115,6 +115,15 @@ export const AdminLoginView: React.FC = () => {
             </button>
           </div>
         )}
+
+        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <a
+            href={window.location.port === '5181' ? 'http://localhost:5180' : '/'}
+            style={{ color: '#888', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <span>← Volver al Portal Web Principal</span>
+          </a>
+        </div>
       </div>
     </div>
   );

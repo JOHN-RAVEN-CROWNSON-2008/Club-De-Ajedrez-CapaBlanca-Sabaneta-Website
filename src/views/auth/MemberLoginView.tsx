@@ -119,6 +119,13 @@ export const MemberLoginView: React.FC = () => {
             Regístrate aquí
           </Link>
         </div>
+
+        <div style={{ marginTop: '0.8rem', textAlign: 'center', fontSize: '0.8rem', color: '#666' }}>
+          ¿Aún no eres socio del club?{' '}
+          <Link to="/afiliarse" style={{ color: '#aaa', textDecoration: 'underline' }}>
+            Radica tu solicitud de admisión
+          </Link>
+        </div>
       </div>
     </div>
   );
