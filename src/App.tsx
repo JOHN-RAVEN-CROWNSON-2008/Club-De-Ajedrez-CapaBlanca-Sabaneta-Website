@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-route
 import { AuthProvider } from './context/AuthContext';
 import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
+import { PromoPopupModal } from './components/common/PromoPopupModal';
 
 // Public views
 import { HomeView } from './views/public/HomeView';
@@ -16,6 +17,7 @@ import { ContactView } from './views/public/ContactView';
 import { VerifyCertificateView } from './views/public/VerifyCertificateView';
 import { ChessClockView } from './views/public/ChessClockView';
 import { MembershipApplicationView } from './views/public/MembershipApplicationView';
+import { DataPrivacyPolicyView } from './views/public/DataPrivacyPolicyView';
 
 // Auth views
 import { MemberLoginView } from './views/auth/MemberLoginView';
@@ -43,6 +45,7 @@ const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       <Header />
       <main id="contenido">{children}</main>
       <Footer />
+      <PromoPopupModal />
     </>
   );
 };
@@ -82,6 +85,7 @@ export const App: React.FC = () => {
             <Route path="/contacto" element={<PublicLayout><ContactView /></PublicLayout>} />
             <Route path="/afiliarse" element={<PublicLayout><MembershipApplicationView /></PublicLayout>} />
             <Route path="/verificar" element={<PublicLayout><VerifyCertificateView /></PublicLayout>} />
+            <Route path="/politica-de-datos" element={<PublicLayout><DataPrivacyPolicyView /></PublicLayout>} />
             <Route path="/reloj" element={<ChessClockView />} />
 
             {/* Rutas de Autenticación */}

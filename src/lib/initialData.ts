@@ -1,7 +1,8 @@
 import {
   SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration,
-  ClassAttendance, ClubTrophy, MembershipApplication, AIProviderSetting, ContentBlock
+  ClassAttendance, ClubTrophy, MembershipApplication, AIProviderSetting, ContentBlock,
+  PromoPopup
 } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
@@ -905,6 +906,23 @@ export const INITIAL_CONTENT_BLOCKS: ContentBlock[] = [
     value_type: 'text',
     value: 'Sí, contamos con módulos virtuales vía Zoom y Lichess con análisis interactivo de partidas.',
   },
+];
+
+export const INITIAL_PROMO_POPUPS: PromoPopup[] = [
+  {
+    id: 'popup-1',
+    title: '¡Inscripciones Abiertas Segundo Semestre 2026!',
+    image_url: '/assets/img/flyer-inscripciones.webp',
+    link_type: 'form',
+    link_value: '/afiliarse',
+    active: true,
+    pages: ['*'],
+    frequency: 'once_per_session',
+    impressions_count: 142,
+    clicks_count: 28,
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  }
 ];
 
 

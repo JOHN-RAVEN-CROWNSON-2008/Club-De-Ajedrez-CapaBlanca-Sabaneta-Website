@@ -94,6 +94,94 @@ class AIService {
     };
   }
 
+  /**
+   * Genera un borrador completo de artículo para el blog optimizado para SEO y AEO
+   */
+  public async generateBlogPostDraft(params: {
+    topic: string;
+    category?: string;
+    tone?: string;
+    keywords?: string[];
+  }): Promise<{
+    title: string;
+    slug: string;
+    excerpt: string;
+    content: string;
+    suggested_alt: string;
+  }> {
+    const { topic, category = 'Formativo', tone = 'Pedagógico y Motivacional', keywords = [] } = params;
+
+    const prompt = `Redacta un artículo de blog oficial para el Club Deportivo de Ajedrez Capablanca Sabaneta.
+Tema: ${topic}
+Categoría: ${category}
+Tono: ${tone}
+Palabras clave: ${keywords.join(', ') || 'ajedrez, sabaneta, entrenamiento, capablanca'}
+
+Estructura obligatoria del artículo para optimización SEO/AEO:
+- Título atractivo y de alto impacto (máximo 70 caracteres).
+- Slug limpio (en minúsculas separado por guiones).
+- Extracto / Meta-descripción concisa (140-160 caracteres).
+- Texto alternativo sugerido para la foto principal.
+- Cuerpo del artículo:
+  * Primer párrafo de "respuesta directa" que responde qué, cómo o por qué de manera contundente y verificable.
+  * Encabezados H2 (##) y H3 (###) organizando conceptos clave.
+  * Viñetas o consejos prácticos aplicables.
+  * Conclusión invitando a los entrenamientos en la sede CC Aves María de Sabaneta.
+
+Por favor responde en este formato estructurado:
+[TITULO]
+(Escribe el título aquí)
+[SLUG]
+(Escribe el slug aquí)
+[EXTRACTO]
+(Escribe el extracto aquí)
+[ALT]
+(Escribe el texto alternativo aquí)
+[CONTENIDO]
+(Escribe el contenido completo del artículo en Markdown aquí)`;
+
+    const res = await this.generateText({
+      prompt,
+      feature: 'blog_writer',
+      maxTokens: 2000,
+      temperature: 0.7,
+    });
+
+    const text = res.text || '';
+
+    // Extracción de campos estructurados
+    const extractSection = (tag: string, nextTag?: string) => {
+      const start = text.indexOf(`[${tag}]`);
+      if (start === -1) return '';
+      const contentStart = start + `[${tag}]`.length;
+      const end = nextTag ? text.indexOf(`[${nextTag}]`, contentStart) : text.length;
+      return text.slice(contentStart, end === -1 ? text.length : end).trim();
+    };
+
+    let title = extractSection('TITULO', 'SLUG');
+    let slug = extractSection('SLUG', 'EXTRACTO');
+    let excerpt = extractSection('EXTRACTO', 'ALT');
+    let suggested_alt = extractSection('ALT', 'CONTENIDO');
+    let content = extractSection('CONTENIDO');
+
+    // Fallback inteligente si el LLM responde en texto corrido
+    if (!title || !content) {
+      title = topic.length > 60 ? topic.slice(0, 57) + '...' : topic;
+      slug = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      excerpt = `Descubre cómo potenciar tus habilidades ajedrecísticas y el pensamiento estratégico con los maestros del Club Capablanca Sabaneta.`;
+      suggested_alt = `Fotografía deportiva ilustrando ${topic} en el Club Capablanca Sabaneta`;
+      content = text || `## El Ajedrez como Disciplina Formativa Integral\n\nEl aprendizaje del ajedrez en el **Club Deportivo Capablanca Sabaneta** fortalece la toma de decisiones, la anticipación y el respeto mutuo frente al tablero.\n\n### 1. Pensamiento Estratégico y Cálculo\nDominar los fundamentos posicionales y tácticos permite evaluar alternativas con rigor metodológico, trasladando hábitos de concentración a la vida diaria y escolar.\n\n### 2. Formación en Sala de Juego\nEn nuestra sede del Centro Comercial Aves María (Piso 3, Sabaneta), fomentamos la camaradería y el análisis riguroso de cada partida, cultivando la resiliencia ante la derrota y la humildad en la victoria.\n\n¡Te esperamos en nuestros semilleros y entrenamientos oficiales!`;
+    }
+
+    return {
+      title,
+      slug: slug || 'cronica-ajedrecistica-capablanca',
+      excerpt,
+      content,
+      suggested_alt: suggested_alt || `Foto del artículo: ${title}`,
+    };
+  }
+
   // =========================================================================
   // GESTIÓN DE CONFIGURACIÓN DE PROVEEDORES (ai_provider_settings)
   // =========================================================================

@@ -230,7 +230,29 @@ export interface MembershipApplication {
   health_provider?: string;
   status: ApplicationStatus;
   notes?: string;
+  linked_profile_id?: string;
   created_at: string;
+}
+
+// 18. Ventanas emergentes y avisos promocionales administrables (Bloque 9)
+export type PopupLinkType = 'internal_page' | 'external_url' | 'document' | 'form';
+export type PopupFrequency = 'once_per_session' | 'once_per_day' | 'always';
+
+export interface PromoPopup {
+  id: string;
+  title: string;
+  image_url: string;
+  link_type: PopupLinkType;
+  link_value: string;
+  active: boolean;
+  starts_at?: string;
+  ends_at?: string;
+  pages: string[];
+  frequency: PopupFrequency;
+  impressions_count: number;
+  clicks_count: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Vista pública segura para validación de certificados y escalafón sin exponer datos personales

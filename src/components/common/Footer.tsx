@@ -41,6 +41,7 @@ export const Footer: React.FC = () => {
             <li><Link to="/afiliarse" style={{ color: '#4ade80', fontWeight: 600 }}>Solicitud de Afiliación</Link></li>
             <li><Link to="/reloj">Reloj de Ajedrez Oficial</Link></li>
             <li><Link to="/verificar" style={{ color: 'var(--gold)', fontWeight: 600 }}>Validar Certificado</Link></li>
+            <li><Link to="/politica-de-datos" style={{ color: '#aaa' }}>Política de Datos (Ley 1581)</Link></li>
           </ul>
         </div>
 
@@ -78,7 +79,10 @@ export const Footer: React.FC = () => {
       {/* Barra inferior */}
       <div className="wrap" style={{ borderTop: '1px solid #222', paddingTop: '1.5rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: '#777' }}>
         <p>© {new Date().getFullYear()} Club Deportivo de Ajedrez Capablanca Sabaneta. Todos los derechos reservados.</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <Link to="/politica-de-datos" style={{ color: '#aaa', textDecoration: 'underline' }}>
+            Política de Privacidad y Tratamiento de Datos (Habeas Data)
+          </Link>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ShieldCheck size={16} color="var(--gold)" />
             <span>Afiliación Deportiva Oficial</span>

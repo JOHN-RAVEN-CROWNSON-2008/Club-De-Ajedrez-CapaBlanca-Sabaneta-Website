@@ -208,14 +208,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         telefono: data.telefono || '',
         categoria_ajedrez: data.categoria || 'Iniciación',
         role: 'student',
-        estado: 'active',
+        estado: 'pending',
         created_at: new Date().toISOString(),
       };
       setUser(newMember);
       localStorage.setItem('capablanca_mock_session', JSON.stringify(newMember));
       // Enviar correo de bienvenida con Resend
       await resendService.sendWelcomeEmail(data.email, `${data.nombre} ${data.apellido}`);
-      return { success: true, emailConfirmationRequired: false };
+      return { success: true, emailConfirmationRequired: true };
     }
 
     try {
@@ -238,6 +238,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Si Supabase requiere confirmación de correo electrónico, session será null
       const emailConfirmationRequired = !authData.session;
+
+      // Vincular con solicitud formal de afiliación en membership_applications y marcar estado 'pending'
+      if (authData.user) {
+        try {
+          await supabase.from('profiles').update({ estado: 'pending' }).eq('id', authData.user.id);
+          await supabase.from('membership_applications').insert({
+            applicant_name: data.nombre,
+            applicant_lastname: data.apellido,
+            doc_type: 'TI',
+            doc_number: 'Pendiente de verificación',
+            email: data.email,
+            phone: data.telefono || 'Sin teléfono',
+            desired_category: data.categoria || 'Iniciación',
+            status: 'pending',
+            notes: 'Solicitud de afiliación registrada desde el portal web',
+            linked_profile_id: authData.user.id,
+          });
+        } catch (linkErr) {
+          console.warn('Aviso al vincular solicitud de afiliación:', linkErr);
+        }
+      }
 
       // Enviar correo de bienvenida/notificación sin bloquear la respuesta
       resendService.sendWelcomeEmail(data.email, `${data.nombre} ${data.apellido}`).catch((e) => {

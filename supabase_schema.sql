@@ -369,11 +369,32 @@ CREATE TABLE IF NOT EXISTS public.membership_applications (
     health_provider TEXT,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'contacted', 'approved', 'rejected')),
     notes TEXT,
+    linked_profile_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 -- ==============================================================================
--- 18. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
+-- 18. TABLA: promo_popups (Ventanas emergentes y avisos promocionales - Bloque 9)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.promo_popups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    link_type TEXT NOT NULL CHECK (link_type IN ('internal_page', 'external_url', 'document', 'form')),
+    link_value TEXT NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT true,
+    starts_at TIMESTAMPTZ,
+    ends_at TIMESTAMPTZ,
+    pages TEXT[] NOT NULL DEFAULT ARRAY['*'],
+    frequency TEXT NOT NULL DEFAULT 'once_per_session' CHECK (frequency IN ('once_per_session', 'once_per_day', 'always')),
+    impressions_count INTEGER NOT NULL DEFAULT 0,
+    clicks_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- ==============================================================================
+-- 19. HABILITACIÓN DE ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
@@ -390,6 +411,7 @@ ALTER TABLE public.tournament_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.club_trophies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.membership_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promo_popups ENABLE ROW LEVEL SECURITY;
 
 
 -- ==============================================================================
@@ -508,6 +530,19 @@ CREATE POLICY "Solicitudes insercion publica" ON public.membership_applications 
 
 DROP POLICY IF EXISTS "Admins gestionan solicitudes" ON public.membership_applications;
 CREATE POLICY "Admins gestionan solicitudes" ON public.membership_applications FOR ALL USING (public.is_admin());
+
+-- Promo Popups (Ventanas Emergentes y Avisos Promocionales)
+DROP POLICY IF EXISTS "Popups lectura publica vigentes" ON public.promo_popups;
+CREATE POLICY "Popups lectura publica vigentes" ON public.promo_popups
+    FOR SELECT USING (
+        active = true 
+        AND (starts_at IS NULL OR starts_at <= timezone('utc'::text, now())) 
+        AND (ends_at IS NULL OR ends_at >= timezone('utc'::text, now()))
+    );
+
+DROP POLICY IF EXISTS "Admins gestionan popups" ON public.promo_popups;
+CREATE POLICY "Admins gestionan popups" ON public.promo_popups
+    FOR ALL USING (public.is_admin());
 
 -- ==============================================================================
 -- 18. SEED DATA (DATOS INICIALES COMPLETOS)

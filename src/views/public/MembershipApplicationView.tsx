@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { resendService } from '../../services/resendService';
 import { whatsappService } from '../../services/whatsappService';
@@ -642,7 +642,7 @@ export const MembershipApplicationView: React.FC = () => {
 
             {/* Aviso de Tratamiento de Datos */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '2rem', lineHeight: 1.5 }}>
-              Al enviar esta solicitud, autorizas al <strong>Club Deportivo de Ajedrez Capablanca Sabaneta</strong> el tratamiento de los datos personales suministrados para fines estrictamente deportivos, académicos y de vinculación ante el INDER Sabaneta y la Liga de Ajedrez de Antioquia, conforme a la Ley 1581 de 2012.
+              Al enviar esta solicitud, autorizas al <strong>Club Deportivo de Ajedrez Capablanca Sabaneta</strong> el tratamiento de los datos personales suministrados para fines estrictamente deportivos, académicos y de vinculación ante el INDER Sabaneta y la Liga de Ajedrez de Antioquia, conforme a la <Link to="/politica-de-datos" target="_blank" style={{ color: '#0f172a', fontWeight: 700, textDecoration: 'underline' }}>Ley 1581 de 2012 (Habeas Data)</Link>. Consulta nuestra <Link to="/politica-de-datos" target="_blank" style={{ color: '#0f172a', fontWeight: 700, textDecoration: 'underline' }}>Política de Tratamiento de Datos Personales aquí</Link>.
             </div>
 
             {/* Botón de Envío */}

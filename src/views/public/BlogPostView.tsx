@@ -61,6 +61,67 @@ export const BlogPostView: React.FC = () => {
     loadPost();
   }, [slug]);
 
+  // Inyección de SEO y Marcado Estructurado schema.org/Article (GEO/AEO)
+  useEffect(() => {
+    if (!post) return;
+
+    document.title = `${post.title} | Club Capablanca Sabaneta`;
+
+    // Meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute('content', post.excerpt || post.title);
+
+    // Schema.org Article JSON-LD
+    const scriptId = 'schema-article-jsonld';
+    let scriptTag = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = scriptId;
+      scriptTag.type = 'application/ld+json';
+      document.head.appendChild(scriptTag);
+    }
+
+    const jsonLdData = {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description: post.excerpt,
+      image: post.cover_image ? window.location.origin + post.cover_image : undefined,
+      datePublished: post.published_at || post.created_at,
+      dateModified: post.created_at,
+      author: {
+        '@type': 'Organization',
+        name: 'Cuerpo Técnico - Club Deportivo de Ajedrez Capablanca Sabaneta',
+        url: window.location.origin,
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Club Deportivo de Ajedrez Capablanca Sabaneta',
+        logo: {
+          '@type': 'ImageObject',
+          url: `${window.location.origin}/assets/img/logo-capablanca.png`,
+        },
+      },
+      articleSection: post.category,
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': window.location.href,
+      },
+    };
+
+    scriptTag.text = JSON.stringify(jsonLdData);
+
+    return () => {
+      const existingScript = document.getElementById(scriptId);
+      if (existingScript) existingScript.remove();
+    };
+  }, [post]);
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -107,6 +168,183 @@ export const BlogPostView: React.FC = () => {
     );
   }
 
+  // Helper para procesar **negrita**
+  const formatInlineText = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={pIdx} style={{ color: '#fff', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
+  // Renderizador semántico de Markdown con soporte H2, H3, figuras con imagen, citas y listas
+  const renderFormattedBlogBody = (content: string) => {
+    if (!content) return null;
+
+    const blocks = content.split(/\n\s*\n/);
+
+    return blocks.map((block, bIdx) => {
+      const trimmed = block.trim();
+      if (!trimmed) return null;
+
+      // 1. Imagen en línea: ![alt](url)
+      const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
+      if (imgMatch) {
+        const alt = imgMatch[1] || '';
+        const rawUrl = imgMatch[2] || '';
+        const url = normalizeImageUrl(rawUrl);
+        return (
+          <figure
+            key={`img-${bIdx}`}
+            style={{
+              margin: '2.5rem 0',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid #282828',
+              background: '#121212',
+            }}
+          >
+            <img
+              src={url}
+              alt={alt || post.title}
+              onError={handleImageError}
+              style={{ width: '100%', maxHeight: '480px', objectFit: 'cover', display: 'block' }}
+            />
+            {alt && (
+              <figcaption
+                style={{
+                  padding: '0.6rem 1rem',
+                  fontSize: '0.85rem',
+                  color: '#aaa',
+                  textAlign: 'center',
+                  background: '#181818',
+                  borderTop: '1px solid #242424',
+                }}
+              >
+                {alt}
+              </figcaption>
+            )}
+          </figure>
+        );
+      }
+
+      // 2. Encabezado H2: ## Titulo
+      if (trimmed.startsWith('## ')) {
+        const titleText = trimmed.replace(/^##\s+/, '');
+        return (
+          <h2
+            key={`h2-${bIdx}`}
+            style={{
+              fontSize: '1.65rem',
+              color: '#fff',
+              marginTop: '2.8rem',
+              marginBottom: '1rem',
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              borderBottom: '1px solid #262626',
+              paddingBottom: '0.5rem',
+            }}
+          >
+            {titleText}
+          </h2>
+        );
+      }
+
+      // 3. Encabezado H3: ### Subtitulo
+      if (trimmed.startsWith('### ')) {
+        const titleText = trimmed.replace(/^###\s+/, '');
+        return (
+          <h3
+            key={`h3-${bIdx}`}
+            style={{
+              fontSize: '1.3rem',
+              color: 'var(--gold)',
+              marginTop: '2rem',
+              marginBottom: '0.75rem',
+              fontWeight: 700,
+            }}
+          >
+            {titleText}
+          </h3>
+        );
+      }
+
+      // 4. Bloque de Cita / Direct Answer: > Texto
+      if (trimmed.startsWith('> ')) {
+        const quoteText = trimmed.replace(/^>\s+/, '');
+        return (
+          <blockquote
+            key={`quote-${bIdx}`}
+            style={{
+              margin: '2rem 0',
+              padding: '1.2rem 1.5rem',
+              background: 'linear-gradient(90deg, rgba(245,197,24,0.08) 0%, rgba(20,20,20,0.5) 100%)',
+              borderLeft: '4px solid var(--gold)',
+              borderRadius: '0 10px 10px 0',
+              color: '#f3e8c8',
+              fontStyle: 'italic',
+              fontSize: '1.05rem',
+              lineHeight: 1.7,
+            }}
+          >
+            {formatInlineText(quoteText)}
+          </blockquote>
+        );
+      }
+
+      // 5. Lista con viñetas: líneas que inician con - o *
+      const lines = trimmed.split('\n');
+      const isList = lines.every((l) => l.trim().startsWith('- ') || l.trim().startsWith('* '));
+      if (isList && lines.length > 0) {
+        return (
+          <ul key={`ul-${bIdx}`} style={{ margin: '1.5rem 0', paddingLeft: '1.5rem', listStyle: 'none' }}>
+            {lines.map((line, lIdx) => {
+              const itemText = line.trim().replace(/^[-*]\s+/, '');
+              return (
+                <li
+                  key={`li-${lIdx}`}
+                  style={{
+                    position: 'relative',
+                    marginBottom: '0.6rem',
+                    lineHeight: 1.7,
+                    fontSize: '1.05rem',
+                    color: '#d4d4d4',
+                    paddingLeft: '1.2rem',
+                  }}
+                >
+                  <span style={{ position: 'absolute', left: 0, color: 'var(--gold)', fontWeight: 'bold' }}>•</span>
+                  {formatInlineText(itemText)}
+                </li>
+              );
+            })}
+          </ul>
+        );
+      }
+
+      // 6. Párrafo estándar con soporte para saltos de línea internos
+      return (
+        <p
+          key={`p-${bIdx}`}
+          style={{
+            fontSize: '1.08rem',
+            lineHeight: 1.85,
+            color: '#d8d8d8',
+            margin: '1.25rem 0',
+          }}
+        >
+          {lines.map((line, lIdx) => (
+            <React.Fragment key={`line-${lIdx}`}>
+              {formatInlineText(line)}
+              {lIdx < lines.length - 1 && <br />}
+            </React.Fragment>
+          ))}
+        </p>
+      );
+    });
+  };
+
   return (
     <div style={{ paddingTop: 'var(--content-offset)', background: '#0d0d0d', color: '#fff', minHeight: '100vh' }}>
       <div className="wrap-narrow" style={{ paddingBlock: '3rem' }}>
@@ -118,11 +356,28 @@ export const BlogPostView: React.FC = () => {
           <span>Volver al blog</span>
         </Link>
 
-        <span className="pill pill--gold" style={{ marginBottom: '1rem', display: 'inline-block' }}>
+        <span
+          style={{
+            display: 'inline-block',
+            fontSize: '0.85rem',
+            color: 'var(--gold)',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '0.75rem',
+          }}
+        >
           {post.category}
         </span>
 
-        <h1 className="display display--gold" style={{ fontSize: 'var(--step-4)', lineHeight: 1.15, marginBottom: '1.5rem' }}>
+        <h1
+          className="display display--gold"
+          style={{
+            fontSize: 'clamp(2rem, 5vw, 3rem)',
+            lineHeight: 1.15,
+            marginBottom: '1rem',
+          }}
+        >
           {post.title}
         </h1>
 
@@ -148,15 +403,8 @@ export const BlogPostView: React.FC = () => {
           </div>
         )}
 
-        <div
-          style={{
-            fontSize: '1.1rem',
-            lineHeight: 1.8,
-            color: '#ddd',
-            whiteSpace: 'pre-line',
-          }}
-        >
-          {post.content}
+        <div style={{ fontSize: '1.1rem', lineHeight: 1.8, color: '#ddd' }}>
+          {renderFormattedBlogBody(post.content)}
         </div>
 
         {/* Barra de Difusión y Compartir */}

@@ -9,7 +9,7 @@ import {
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
   INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS,
   INITIAL_ATTENDANCE, INITIAL_TROPHIES, INITIAL_APPLICATIONS,
-  INITIAL_AI_PROVIDERS, INITIAL_CONTENT_BLOCKS
+  INITIAL_AI_PROVIDERS, INITIAL_CONTENT_BLOCKS, INITIAL_PROMO_POPUPS
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
@@ -17,7 +17,7 @@ import {
   GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus,
   ClubTrophy, TrophyType, MembershipApplication, ApplicationStatus,
   AIProviderSetting, AIProvider, ContentBlock, ContentBlockPage, ContentBlockValueType,
-  DocumentCategory
+  DocumentCategory, PromoPopup, PopupLinkType, PopupFrequency
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
@@ -25,7 +25,8 @@ import {
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
   UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2, Archive,
-  Sparkles, Bot, Cpu, Sliders, RefreshCw, Play, Activity
+  Sparkles, Bot, Cpu, Sliders, RefreshCw, Play, Activity, Layers, ExternalLink,
+  FileSpreadsheet, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -46,7 +47,7 @@ export const AdminDashboardView: React.FC = () => {
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState<
-    'overview' | 'content' | 'ai' | 'events' | 'blog' | 'documents' | 'gallery' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages' | 'audit'
+    'overview' | 'content' | 'ai' | 'events' | 'blog' | 'documents' | 'gallery' | 'members' | 'payments' | 'schedules' | 'announcements' | 'popups' | 'messages' | 'audit'
   >('overview');
 
   // MODO AI & Proveedores LLM
@@ -181,6 +182,50 @@ export const AdminDashboardView: React.FC = () => {
     cover_image: '/assets/img/club-galeria-04.webp',
   });
 
+  // Blog con IA y previsualización (Bloque 10)
+  const [showAiBlogModal, setShowAiBlogModal] = useState(false);
+  const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
+  const [blogEditorTab, setBlogEditorTab] = useState<'editor' | 'preview'>('editor');
+  const [inlineBlogImageUrl, setInlineBlogImageUrl] = useState('');
+  const [inlineBlogImageDesc, setInlineBlogImageDesc] = useState('');
+  const [showInlineImageModal, setShowInlineImageModal] = useState(false);
+  const [aiBlogParams, setAiBlogParams] = useState({
+    topic: '',
+    category: 'Formativo',
+    targetAudience: 'Afiliados y estudiantes del club',
+    keywords: 'ajedrez, táctica, Sabaneta, Capablanca, entrenamiento',
+  });
+
+  // Pop-ups y Banners Promocionales (Bloque 9)
+  const [popups, setPopups] = useState<PromoPopup[]>(INITIAL_PROMO_POPUPS);
+  const [showPopupModal, setShowPopupModal] = useState(false);
+  const [editingPopupId, setEditingPopupId] = useState<string | null>(null);
+  const [previewPopup, setPreviewPopup] = useState<PromoPopup | null>(null);
+  const [popupForm, setPopupForm] = useState<{
+    title: string;
+    image_url: string;
+    link_type: PopupLinkType;
+    link_value: string;
+    active: boolean;
+    frequency: PopupFrequency;
+    pages: string[];
+    starts_at: string;
+    ends_at: string;
+  }>({
+    title: '',
+    image_url: '',
+    link_type: 'internal_page',
+    link_value: '/torneos',
+    active: true,
+    frequency: 'once_per_session',
+    pages: ['*'],
+    starts_at: '',
+    ends_at: '',
+  });
+
+  // Descargas de tesorería y comprobantes (Bloque 11)
+  const [isExportingBatchReceipts, setIsExportingBatchReceipts] = useState(false);
+
   const [showDocModal, setShowDocModal] = useState(false);
   const [newDoc, setNewDoc] = useState({
     title: '', description: '', category: 'Material de Estudio' as const,
@@ -296,6 +341,9 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: msgs } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
         if (msgs && msgs.length > 0) setMessages(msgs as ContactMessage[]);
+
+        const { data: popData } = await supabase.from('promo_popups').select('*').order('created_at', { ascending: false });
+        if (popData && popData.length > 0) setPopups(popData as PromoPopup[]);
 
         const provs = await aiService.getProviderSettings();
         if (provs && provs.length > 0) setAiProviders(provs);
@@ -666,6 +714,179 @@ export const AdminDashboardView: React.FC = () => {
     }
     setPosts(posts.filter((p) => p.id !== id));
     triggerNotice('Artículo eliminado');
+  };
+
+  // Blog con IA (Bloque 10)
+  const handleGenerateAiBlog = async () => {
+    if (!aiBlogParams.topic.trim()) {
+      triggerNotice('Por favor escribe un tema para el artículo', 'error');
+      return;
+    }
+    setIsGeneratingBlog(true);
+    triggerNotice('Redactando artículo optimizado para SEO y ajedrez con IA...');
+    try {
+      const draft = await aiService.generateBlogPostDraft({
+        topic: aiBlogParams.topic,
+        category: aiBlogParams.category,
+        tone: aiBlogParams.targetAudience,
+        keywords: aiBlogParams.keywords.split(',').map((k) => k.trim()).filter(Boolean),
+      });
+
+      setNewPost({
+        title: draft.title,
+        excerpt: draft.excerpt,
+        content: draft.content,
+        category: aiBlogParams.category,
+        cover_image: newPost.cover_image || '/assets/img/club-galeria-04.webp',
+      });
+      setShowAiBlogModal(false);
+      setShowPostModal(true);
+      setBlogEditorTab('editor');
+      triggerNotice('✓ Borrador redactado con éxito por la IA. Revisa y publica cuando estés listo.');
+    } catch (err) {
+      console.error('Error al generar borrador con IA:', err);
+      triggerNotice('Error al generar borrador con IA. Se activó el respaldo local.', 'error');
+    } finally {
+      setIsGeneratingBlog(false);
+    }
+  };
+
+  const handleInsertInlineImage = () => {
+    if (!inlineBlogImageUrl.trim()) {
+      triggerNotice('Debes ingresar la URL de la imagen a insertar', 'error');
+      return;
+    }
+    const altText = inlineBlogImageDesc.trim() || 'Diagrama o fotografía de ajedrez';
+    const markdownImage = `\n\n![${altText}](${inlineBlogImageUrl.trim()})\n*${altText}*\n\n`;
+    setNewPost((prev) => ({
+      ...prev,
+      content: prev.content + markdownImage,
+    }));
+    setInlineBlogImageUrl('');
+    setInlineBlogImageDesc('');
+    setShowInlineImageModal(false);
+    triggerNotice('Imagen insertada en el cuerpo del artículo');
+  };
+
+  // Pop-ups y Banners Promocionales (Bloque 9)
+  const handleOpenNewPopup = () => {
+    setEditingPopupId(null);
+    setPopupForm({
+      title: '',
+      image_url: '',
+      link_type: 'internal_page',
+      link_value: '/torneos',
+      active: true,
+      frequency: 'once_per_session',
+      pages: ['*'],
+      starts_at: '',
+      ends_at: '',
+    });
+    setShowPopupModal(true);
+  };
+
+  const handleEditPopup = (p: PromoPopup) => {
+    setEditingPopupId(p.id);
+    setPopupForm({
+      title: p.title,
+      image_url: p.image_url,
+      link_type: p.link_type,
+      link_value: p.link_value,
+      active: p.active,
+      frequency: p.frequency,
+      pages: p.pages || ['*'],
+      starts_at: p.starts_at ? p.starts_at.slice(0, 10) : '',
+      ends_at: p.ends_at ? p.ends_at.slice(0, 10) : '',
+    });
+    setShowPopupModal(true);
+  };
+
+  const handleSavePopup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!popupForm.title.trim() || !popupForm.image_url.trim()) {
+      triggerNotice('Por favor ingresa un título y una imagen de banner para el pop-up', 'error');
+      return;
+    }
+
+    const payload: PromoPopup = {
+      id: editingPopupId || crypto.randomUUID(),
+      title: popupForm.title.trim(),
+      image_url: popupForm.image_url.trim(),
+      link_type: popupForm.link_type,
+      link_value: popupForm.link_value.trim() || '/',
+      active: popupForm.active,
+      frequency: popupForm.frequency,
+      pages: popupForm.pages.length > 0 ? popupForm.pages : ['*'],
+      starts_at: popupForm.starts_at ? new Date(popupForm.starts_at).toISOString() : undefined,
+      ends_at: popupForm.ends_at ? new Date(popupForm.ends_at + 'T23:59:59').toISOString() : undefined,
+      impressions_count: editingPopupId ? (popups.find((p) => p.id === editingPopupId)?.impressions_count || 0) : 0,
+      clicks_count: editingPopupId ? (popups.find((p) => p.id === editingPopupId)?.clicks_count || 0) : 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (editingPopupId) {
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('promo_popups').update(payload).eq('id', editingPopupId);
+        } catch (err) {
+          console.error('Error al actualizar pop-up en Supabase:', err);
+        }
+      }
+      setPopups(popups.map((p) => (p.id === editingPopupId ? { ...p, ...payload } : p)));
+      triggerNotice('Pop-up promocional actualizado exitosamente');
+    } else {
+      payload.created_at = new Date().toISOString();
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('promo_popups').insert(payload);
+        } catch (err) {
+          console.error('Error al crear pop-up en Supabase:', err);
+        }
+      }
+      setPopups([payload, ...popups]);
+      triggerNotice('Nuevo Pop-up promocional publicado y programado');
+    }
+
+    setShowPopupModal(false);
+  };
+
+  const handleTogglePopupActive = async (popup: PromoPopup) => {
+    const nextActive = !popup.active;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('promo_popups').update({ active: nextActive }).eq('id', popup.id);
+      } catch (err) {
+        console.error('Error al alternar estado del popup:', err);
+      }
+    }
+    setPopups(popups.map((p) => (p.id === popup.id ? { ...p, active: nextActive } : p)));
+    triggerNotice(`Pop-up ${nextActive ? 'activado' : 'pausado'}`);
+  };
+
+  const handleDeletePopup = async (id: string) => {
+    if (!confirm('¿Deseas eliminar este pop-up promocional?')) return;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('promo_popups').delete().eq('id', id);
+      } catch (err) {
+        console.error('Error al eliminar pop-up en Supabase:', err);
+      }
+    }
+    setPopups(popups.filter((p) => p.id !== id));
+    triggerNotice('Pop-up eliminado');
+  };
+
+  const handleResetPopupStats = async (id: string) => {
+    if (!confirm('¿Restablecer métricas (impresiones y clics) a 0?')) return;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('promo_popups').update({ impressions_count: 0, clicks_count: 0 }).eq('id', id);
+      } catch (err) {
+        console.error('Error al resetear métricas en Supabase:', err);
+      }
+    }
+    setPopups(popups.map((p) => (p.id === id ? { ...p, impressions_count: 0, clicks_count: 0 } : p)));
+    triggerNotice('Métricas de visualización restablecidas');
   };
 
   // Documento
@@ -1107,6 +1328,91 @@ export const AdminDashboardView: React.FC = () => {
     }
   };
 
+  // Descarga individual de comprobante de pago con nombre normalizado (Bloque 11)
+  const handleDownloadReceipt = async (payment: MembershipPayment) => {
+    if (!payment.receipt_url) {
+      triggerNotice('El pago no cuenta con comprobante adjunto', 'error');
+      return;
+    }
+    triggerNotice('Generando enlace seguro de descarga...');
+    const signedUrl = await getSignedUrl('payment-receipts', payment.receipt_url);
+    if (!signedUrl) {
+      triggerNotice('No se pudo generar la URL de descarga. Verifica los permisos de almacenamiento.', 'error');
+      return;
+    }
+    try {
+      const response = await fetch(signedUrl);
+      const blob = await response.blob();
+      const rawExt = payment.receipt_url.split('.').pop()?.split('?')[0] || 'pdf';
+      const ext = ['png', 'jpg', 'jpeg', 'pdf', 'webp'].includes(rawExt.toLowerCase()) ? rawExt.toLowerCase() : 'pdf';
+      const cleanName = (payment.user_name || payment.user_id || 'Afiliado').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanPeriod = (payment.period || 'periodo').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Comprobante_${cleanName}_${cleanPeriod}.${ext}`;
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      triggerNotice(`✓ Comprobante ${filename} descargado exitosamente`);
+    } catch (err) {
+      console.error('Error al descargar comprobante como blob:', err);
+      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // Exportar Lote de comprobantes / Resumen de Tesorería con URLs seguras (Bloque 11)
+  const handleExportPaymentsWithSignedReceipts = async () => {
+    setIsExportingBatchReceipts(true);
+    triggerNotice('Generando firmas temporales para los comprobantes del reporte...');
+    try {
+      const headers = [
+        'ID', 'Periodo', 'Afiliado', 'Email', 'Monto', 'Método',
+        'Referencia', 'Fecha Pago', 'Estado', 'Revisado Por', 'Fecha Revisión', 'Motivo Rechazo', 'URL Comprobante Seguro'
+      ];
+      
+      const rows = await Promise.all(payments.map(async (p) => {
+        let secureUrl = '';
+        if (p.receipt_url) {
+          secureUrl = await getSignedUrl('payment-receipts', p.receipt_url) || p.receipt_url;
+        }
+        return [
+          p.id,
+          p.period,
+          p.user_name || p.user_id,
+          p.user_email || '',
+          p.amount,
+          p.payment_method,
+          p.reference_number,
+          p.payment_date,
+          p.status,
+          p.reviewed_by || '',
+          p.reviewed_at ? new Date(p.reviewed_at).toLocaleDateString('es-CO') : '',
+          (p.rejection_reason || '').replace(/"/g, '""'),
+          secureUrl,
+        ];
+      }));
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.map((f) => `"${f}"`).join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Auditoria_Tesoreria_Comprobantes_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      triggerNotice('Reporte de tesorería con enlaces de comprobantes exportado con éxito');
+    } catch (err) {
+      console.error('Error al generar lote de comprobantes:', err);
+      triggerNotice('Error al procesar el lote de comprobantes', 'error');
+    } finally {
+      setIsExportingBatchReceipts(false);
+    }
+  };
+
   // Aprobar Pago con auditoría y notificación por email
   const handleApprovePayment = async (payment: MembershipPayment) => {
     setIsSubmittingPaymentReview(true);
@@ -1281,10 +1587,12 @@ export const AdminDashboardView: React.FC = () => {
     await handleUpdateApplicationStatus(app.id, 'approved');
 
     // 2. Incorporar de inmediato a la nómina de afiliados del club
-    const existingIndex = members.findIndex((m) => m.correo?.toLowerCase() === app.email?.toLowerCase());
+    const existingIndex = members.findIndex(
+      (m) => (app.linked_profile_id && m.id === app.linked_profile_id) || m.correo?.toLowerCase() === app.email?.toLowerCase()
+    );
     if (existingIndex === -1) {
       const newMember: UserProfile = {
-        id: `usr-${app.doc_number || crypto.randomUUID().slice(0, 8)}`,
+        id: app.linked_profile_id || `usr-${app.doc_number || crypto.randomUUID().slice(0, 8)}`,
         nombre: app.applicant_name,
         apellido: app.applicant_lastname,
         usuario: `${app.applicant_name.toLowerCase().replace(/[^a-z0-9]/g, '')}${app.doc_number ? app.doc_number.slice(-4) : '2026'}`,
@@ -1319,6 +1627,16 @@ export const AdminDashboardView: React.FC = () => {
     // 3. Sincronizar con Supabase si ya existe el registro de perfil
     if (isSupabaseConfigured()) {
       try {
+        if (app.linked_profile_id) {
+          await supabase
+            .from('profiles')
+            .update({
+              estado: 'active',
+              categoria_ajedrez: app.desired_category || 'Iniciación',
+              elo_rating: app.approximate_elo || 1200,
+            })
+            .eq('id', app.linked_profile_id);
+        }
         await supabase
           .from('profiles')
           .update({
@@ -1522,6 +1840,7 @@ export const AdminDashboardView: React.FC = () => {
             { id: 'payments', label: 'Cuotas & Pagos', icon: <CreditCard size={18} /> },
             { id: 'schedules', label: 'Horarios de Clase', icon: <Calendar size={18} /> },
             { id: 'announcements', label: 'Avisos & Alertas', icon: <Megaphone size={18} /> },
+            { id: 'popups', label: 'Pop-ups & Banners', icon: <Layers size={18} /> },
             { id: 'messages', label: 'Bandeja de Contacto', icon: <Mail size={18} /> },
             { id: 'audit', label: 'Auditoría del Sistema', icon: <Activity size={18} /> },
           ].map((item) => (
@@ -1546,6 +1865,22 @@ export const AdminDashboardView: React.FC = () => {
             >
               {item.icon}
               <span style={{ fontSize: '0.88rem', flex: 1 }}>{item.label}</span>
+              {item.id === 'popups' && popups.filter((p) => p.active).length > 0 && (
+                <span
+                  style={{
+                    background: activeSection === 'popups' ? '#000' : 'rgba(245, 197, 24, 0.2)',
+                    color: activeSection === 'popups' ? 'var(--gold)' : 'var(--gold)',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '50px',
+                    border: '1px solid rgba(245, 197, 24, 0.4)',
+                  }}
+                  title="Pop-ups activos actualmente"
+                >
+                  {popups.filter((p) => p.active).length} act.
+                </span>
+              )}
               {item.id === 'messages' && messages.filter((m) => m.status === 'unread').length > 0 && (
                 <span
                   style={{
@@ -1629,6 +1964,12 @@ export const AdminDashboardView: React.FC = () => {
                   <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Pagos Reportados</div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#81c784', marginTop: '0.3rem' }}>{payments.length}</div>
                 </div>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', padding: '1.5rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>Pop-ups Activos</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--gold)', marginTop: '0.3rem' }}>
+                    {popups.filter((p) => p.active).length} / {popups.length}
+                  </div>
+                </div>
               </div>
 
               <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '14px', padding: '2rem' }}>
@@ -1641,6 +1982,9 @@ export const AdminDashboardView: React.FC = () => {
                   </button>
                   <button onClick={() => { setActiveSection('blog'); setShowPostModal(true); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Plus size={16} /> Redactar Noticia
+                  </button>
+                  <button onClick={() => { setActiveSection('popups'); handleOpenNewPopup(); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Plus size={16} /> Nuevo Pop-up
                   </button>
                   <button onClick={() => { setActiveSection('documents'); setShowDocModal(true); }} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Plus size={16} /> Añadir Documento
@@ -3519,62 +3863,412 @@ export const AdminDashboardView: React.FC = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestión del Blog</h1>
-                  <p style={{ color: '#888' }}>Redacta crónicas y artículos formativos</p>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestión del Blog & Noticias</h1>
+                  <p style={{ color: '#888' }}>Redacta crónicas, artículos formativos y análisis con asistencia de IA</p>
                 </div>
-                <button onClick={() => setShowPostModal(true)} className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Plus size={16} /> Redactar Noticia
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAiBlogModal(true)}
+                    className="btn btn--outline btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--gold)', color: 'var(--gold)' }}
+                  >
+                    <Wand2 size={16} />
+                    <span>Redactar con IA</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPostModal(true); setBlogEditorTab('editor'); }}
+                    className="btn btn--primary btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Plus size={16} />
+                    <span>Redactar Noticia</span>
+                  </button>
+                </div>
               </div>
 
+              {/* Modal de Asistente IA para Blog (Bloque 10) */}
+              {showAiBlogModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0,0,0,0.85)',
+                    backdropFilter: 'blur(5px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1.5rem',
+                  }}
+                  onClick={() => !isGeneratingBlog && setShowAiBlogModal(false)}
+                >
+                  <div
+                    style={{
+                      background: '#161616',
+                      border: '2px solid var(--gold)',
+                      borderRadius: '16px',
+                      maxWidth: '560px',
+                      width: '100%',
+                      padding: '2rem',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', color: 'var(--gold)' }}>
+                      <Sparkles size={24} />
+                      <h3 style={{ fontSize: '1.3rem', margin: 0 }}>Redactor de Contenido Ajedrecístico con IA</h3>
+                    </div>
+                    <p style={{ color: '#aaa', fontSize: '0.88rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                      Genera borradores estructurados con enfoque didáctico, preguntas clave (AEO), encabezados jerárquicos (H2/H3) y optimización para posicionamiento orgánico.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                          Tema o Título del Artículo <span style={{ color: 'var(--gold)' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. La importancia de la estructura de peones en la apertura italiana"
+                          value={aiBlogParams.topic}
+                          onChange={(e) => setAiBlogParams({ ...aiBlogParams, topic: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Categoría
+                          </label>
+                          <select
+                            value={aiBlogParams.category}
+                            onChange={(e) => setAiBlogParams({ ...aiBlogParams, category: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          >
+                            <option value="Formativo">Formativo / Clases</option>
+                            <option value="Torneos">Torneos y Crónicas</option>
+                            <option value="Aperturas">Teoría de Aperturas</option>
+                            <option value="Finales">Finales de Partida</option>
+                            <option value="Historia">Historia del Ajedrez</option>
+                            <option value="Psicología">Psicología Deportiva</option>
+                            <option value="Reglamento">Reglamento FIDE</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Público Objetivo
+                          </label>
+                          <select
+                            value={aiBlogParams.targetAudience}
+                            onChange={(e) => setAiBlogParams({ ...aiBlogParams, targetAudience: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          >
+                            <option value="Afiliados y estudiantes del club">Afiliados del Club</option>
+                            <option value="Principiantes e iniciación infantil">Iniciación Infantil / Principiantes</option>
+                            <option value="Jugadores de competición y elo 1600+">Avanzados / Competición</option>
+                            <option value="Padres y acudientes">Padres y Acudientes</option>
+                            <option value="Público general">Público General</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                          Palabras clave / Términos sugeridos
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="ajedrez Sabaneta, método Capablanca, táctica, cálculo"
+                          value={aiBlogParams.keywords}
+                          onChange={(e) => setAiBlogParams({ ...aiBlogParams, keywords: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          disabled={isGeneratingBlog}
+                          onClick={() => setShowAiBlogModal(false)}
+                          className="btn btn--ghost btn--sm"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isGeneratingBlog || !aiBlogParams.topic.trim()}
+                          onClick={handleGenerateAiBlog}
+                          className="btn btn--primary btn--sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                          {isGeneratingBlog ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              <span>Generando con IA...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles size={16} />
+                              <span>Generar Borrador</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de Inserción de Imagen en Línea */}
+              {showInlineImageModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 10000,
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1.5rem',
+                  }}
+                  onClick={() => setShowInlineImageModal(false)}
+                >
+                  <div
+                    style={{
+                      background: '#181818',
+                      border: '1px solid var(--gold)',
+                      borderRadius: '12px',
+                      maxWidth: '460px',
+                      width: '100%',
+                      padding: '1.5rem',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 style={{ color: 'var(--gold)', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                      Insertar Imagen en el Cuerpo del Artículo
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      <FileUploadField
+                        bucket="gallery"
+                        mode="public"
+                        folder="blog-inline"
+                        accept="image/*"
+                        label="Subir imagen directamente al servidor"
+                        onUploaded={(url) => setInlineBlogImageUrl(url)}
+                      />
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>
+                          O escribe una URL directa de imagen
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="/assets/img/club-galeria-01.webp o https://..."
+                          value={inlineBlogImageUrl}
+                          onChange={(e) => setInlineBlogImageUrl(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#222', border: '1px solid #444', color: '#fff', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.2rem' }}>
+                          Pie de foto / Texto alternativo
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Diagrama de la posición de mate del pastor"
+                          value={inlineBlogImageDesc}
+                          onChange={(e) => setInlineBlogImageDesc(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#222', border: '1px solid #444', color: '#fff', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                        <button type="button" onClick={() => setShowInlineImageModal(false)} className="btn btn--ghost btn--sm">
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleInsertInlineImage}
+                          disabled={!inlineBlogImageUrl.trim()}
+                          className="btn btn--primary btn--sm"
+                        >
+                          Insertar en Texto
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Formulario de Redacción / Edición de Artículo con Pestañas */}
               {showPostModal && (
                 <div style={{ background: '#141414', border: '1px solid #333', borderRadius: '12px', padding: '2rem', marginBottom: '2rem' }}>
-                  <h3 style={{ color: 'var(--gold)', marginBottom: '1.2rem' }}>Nueva Publicación</h3>
-                  <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Título de la publicación"
-                      value={newPost.title}
-                      onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                    />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Categoría (ej. Formativo, Torneos)"
-                        value={newPost.category}
-                        onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Ruta de imagen de portada"
-                        value={newPost.cover_image}
-                        onChange={(e) => setNewPost({ ...newPost, cover_image: e.target.value })}
-                        style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                      />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid #282828', paddingBottom: '0.8rem' }}>
+                    <h3 style={{ color: 'var(--gold)', margin: 0 }}>Nueva Publicación de Blog</h3>
+                    
+                    {/* Switcher de Pestañas: Editor vs Vista Previa */}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBlogEditorTab('editor')}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: blogEditorTab === 'editor' ? 'var(--gold)' : '#262626',
+                          color: blogEditorTab === 'editor' ? '#000' : '#aaa',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Editor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBlogEditorTab('preview')}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: blogEditorTab === 'preview' ? 'var(--gold)' : '#262626',
+                          color: blogEditorTab === 'preview' ? '#000' : '#aaa',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                        }}
+                      >
+                        <Eye size={13} />
+                        <span>Vista Previa</span>
+                      </button>
                     </div>
-                    <textarea
-                      placeholder="Resumen o extracto breve..."
-                      rows={2}
-                      value={newPost.excerpt}
-                      onChange={(e) => setNewPost({ ...newPost, excerpt: e.target.value })}
-                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                    />
-                    <textarea
-                      placeholder="Contenido completo del artículo..."
-                      rows={6}
-                      required
-                      value={newPost.content}
-                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                      style={{ padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
-                    />
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <button type="submit" className="btn btn--primary btn--sm">Publicar Artículo</button>
-                      <button type="button" onClick={() => setShowPostModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                  </div>
+
+                  {blogEditorTab === 'editor' ? (
+                    <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>Título del Artículo</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Título del artículo o crónica..."
+                          value={newPost.title}
+                          onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontSize: '1rem', fontWeight: 600 }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>Categoría</label>
+                          <select
+                            value={newPost.category}
+                            onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          >
+                            <option value="Formativo">Formativo</option>
+                            <option value="Torneos">Torneos</option>
+                            <option value="Aperturas">Aperturas</option>
+                            <option value="Finales">Finales</option>
+                            <option value="Historia">Historia</option>
+                            <option value="Psicología">Psicología</option>
+                            <option value="Reglamento">Reglamento</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>Imagen de Portada (URL o /assets/img/...)</label>
+                          <input
+                            type="text"
+                            placeholder="/assets/img/club-galeria-04.webp"
+                            value={newPost.cover_image}
+                            onChange={(e) => setNewPost({ ...newPost, cover_image: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>Resumen breve (Meta descripción SEO y tarjeta)</label>
+                        <textarea
+                          placeholder="Resumen directo del artículo para buscadores y redes..."
+                          rows={2}
+                          value={newPost.excerpt}
+                          onChange={(e) => setNewPost({ ...newPost, excerpt: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                          <label style={{ fontSize: '0.8rem', color: '#aaa' }}>
+                            Cuerpo del Artículo (Formato Markdown con soporte H2, H3, negritas e imágenes)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowInlineImageModal(true)}
+                            className="btn btn--sm"
+                            style={{ background: '#262626', color: 'var(--gold)', border: '1px solid #444', padding: '0.2rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          >
+                            <ImageIcon size={13} />
+                            <span>Insertar Imagen / Diagrama</span>
+                          </button>
+                        </div>
+                        <textarea
+                          placeholder="Escribe o pega el contenido aquí. Puedes usar ## Encabezados, **negritas** e imágenes..."
+                          rows={12}
+                          required
+                          value={newPost.content}
+                          onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                          style={{ width: '100%', padding: '0.85rem', borderRadius: '8px', background: '#1e1e1e', border: '1px solid #333', color: '#fff', fontFamily: 'monospace', fontSize: '0.9rem', lineHeight: 1.6 }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <button type="submit" className="btn btn--primary btn--sm">Publicar Artículo Oficial</button>
+                        <button type="button" onClick={() => setShowPostModal(false)} className="btn btn--ghost btn--sm">Cancelar</button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* Vista previa en vivo del artículo */
+                    <div>
+                      <div style={{ background: '#0e0e0e', border: '1px solid #222', borderRadius: '10px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        {newPost.cover_image && (
+                          <div style={{ maxHeight: '240px', overflow: 'hidden', borderRadius: '8px', marginBottom: '1rem' }}>
+                            <img src={newPost.cover_image} alt="Portada" style={{ width: '100%', height: 'auto', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        <span style={{ fontSize: '0.75rem', color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase' }}>
+                          {newPost.category}
+                        </span>
+                        <h2 style={{ fontSize: '1.5rem', color: '#fff', margin: '0.4rem 0' }}>
+                          {newPost.title || 'Título del artículo'}
+                        </h2>
+                        <p style={{ color: '#aaa', fontStyle: 'italic', fontSize: '0.95rem', borderLeft: '3px solid var(--gold)', paddingLeft: '0.8rem', margin: '1rem 0' }}>
+                          {newPost.excerpt || 'Sin resumen'}
+                        </p>
+                        <div style={{ color: '#ddd', fontSize: '0.95rem', lineHeight: 1.7, whiteSpace: 'pre-line', borderTop: '1px solid #222', paddingTop: '1rem' }}>
+                          {newPost.content || 'Sin contenido aún...'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button type="button" onClick={() => setBlogEditorTab('editor')} className="btn btn--primary btn--sm">
+                          Regresar a Editar
+                        </button>
+                        <button type="button" onClick={handleCreatePost} className="btn btn--outline btn--sm" style={{ border: '1px solid var(--gold)', color: 'var(--gold)' }}>
+                          Confirmar y Publicar
+                        </button>
+                        <button type="button" onClick={() => setShowPostModal(false)} className="btn btn--ghost btn--sm">
+                          Cerrar
+                        </button>
+                      </div>
                     </div>
-                  </form>
+                  )}
                 </div>
               )}
 
@@ -4175,6 +4869,11 @@ export const AdminDashboardView: React.FC = () => {
                                   <div style={{ fontSize: '0.7rem', color: 'var(--gold)', fontWeight: 600, marginTop: '0.25rem' }}>
                                     {radicadoCode}
                                   </div>
+                                  {app.linked_profile_id && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem', fontSize: '0.68rem', color: '#60a5fa', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                      <Users size={10} /> Cuenta Vinculada (Activar al aprobar)
+                                    </span>
+                                  )}
                                 </td>
 
                                 <td style={{ padding: '1rem' }}>
@@ -4338,15 +5037,28 @@ export const AdminDashboardView: React.FC = () => {
                   <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>Gestor de Cuotas y Pagos</h1>
                   <p style={{ color: '#888', margin: '0.3rem 0 0' }}>Control de mensualidades, comprobantes de pago y auditoría de tesorería</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportPaymentsCSV}
-                  className="btn btn--outline btn--sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--gold)', color: 'var(--gold)' }}
-                  title="Exportar archivo CSV con todo el historial de pagos y auditoría"
-                >
-                  <Download size={15} /> Exportar Tesorería (CSV)
-                </button>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    disabled={isExportingBatchReceipts}
+                    onClick={handleExportPaymentsWithSignedReceipts}
+                    className="btn btn--primary btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    title="Exportar archivo CSV con enlaces seguros y firmados a todos los comprobantes adjuntos"
+                  >
+                    {isExportingBatchReceipts ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+                    <span>Exportar con Enlaces Seguros (CSV)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportPaymentsCSV}
+                    className="btn btn--outline btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--gold)', color: 'var(--gold)' }}
+                    title="Exportar archivo CSV estándar de tesorería"
+                  >
+                    <Download size={15} /> <span>CSV Tesorería</span>
+                  </button>
+                </div>
               </div>
 
               <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
@@ -4409,15 +5121,26 @@ export const AdminDashboardView: React.FC = () => {
                               <MessageCircle size={14} />
                             </button>
                             {p.receipt_url && (
-                              <button
-                                type="button"
-                                onClick={() => handleViewReceipt(p.receipt_url!)}
-                                className="btn btn--sm"
-                                style={{ background: '#1a1a2e', color: '#90caf9', border: '1px solid #303f9f', padding: '0.3rem 0.5rem' }}
-                                title="Ver comprobante adjunto"
-                              >
-                                <Eye size={14} />
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewReceipt(p.receipt_url!)}
+                                  className="btn btn--sm"
+                                  style={{ background: '#1a1a2e', color: '#90caf9', border: '1px solid #303f9f', padding: '0.3rem 0.5rem' }}
+                                  title="Ver comprobante en el navegador"
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadReceipt(p)}
+                                  className="btn btn--sm"
+                                  style={{ background: '#1e293b', color: '#38bdf8', border: '1px solid #0284c7', padding: '0.3rem 0.5rem' }}
+                                  title="Descargar comprobante oficial (Comprobante_{afiliado}_{periodo})"
+                                >
+                                  <Download size={14} />
+                                </button>
+                              </>
                             )}
                             {p.status === 'pending' && (
                               <>
@@ -5069,6 +5792,574 @@ export const AdminDashboardView: React.FC = () => {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* 9.5. SECCIÓN: POP-UPS & BANNERS PROMOCIONALES (Bloque 9) */}
+          {activeSection === 'popups' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    Gestor de Pop-ups & Banners Promocionales
+                  </h1>
+                  <p style={{ color: '#888', margin: '0.3rem 0 0' }}>
+                    Configura avisos flotantes interactivos, segmentación por página, frecuencia y mide conversiones
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenNewPopup}
+                  className="btn btn--primary btn--sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Plus size={16} />
+                  <span>Nuevo Pop-up</span>
+                </button>
+              </div>
+
+              {/* Tarjetas de Métricas Globales de Pop-ups */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>Total Pop-ups</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>{popups.length}</div>
+                </div>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>Activos En Vivo</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4ade80', marginTop: '0.2rem' }}>
+                    {popups.filter((p) => p.active).length}
+                  </div>
+                </div>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>Impresiones Totales</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--gold)', marginTop: '0.2rem' }}>
+                    {popups.reduce((acc, p) => acc + (p.impressions_count || 0), 0)}
+                  </div>
+                </div>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>Clics en Enlaces</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#60a5fa', marginTop: '0.2rem' }}>
+                    {popups.reduce((acc, p) => acc + (p.clicks_count || 0), 0)}
+                  </div>
+                </div>
+                <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>CTR Promedio</div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f59e0b', marginTop: '0.2rem' }}>
+                    {(() => {
+                      const totalImp = popups.reduce((acc, p) => acc + (p.impressions_count || 0), 0);
+                      const totalClicks = popups.reduce((acc, p) => acc + (p.clicks_count || 0), 0);
+                      return totalImp > 0 ? ((totalClicks / totalImp) * 100).toFixed(1) + '%' : '0.0%';
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Listado de Pop-ups */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                {popups.length === 0 ? (
+                  <div style={{ background: '#141414', border: '1px dashed #333', borderRadius: '12px', padding: '3rem', textAlign: 'center', color: '#888' }}>
+                    <Layers size={40} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontSize: '1rem' }}>No hay pop-ups promocionales configurados.</p>
+                    <p style={{ margin: '0.4rem 0 1rem', fontSize: '0.85rem', color: '#666' }}>Crea avisos emergentes para promocionar torneos, inscripciones o circulares.</p>
+                    <button type="button" onClick={handleOpenNewPopup} className="btn btn--primary btn--sm">Crear Primer Pop-up</button>
+                  </div>
+                ) : (
+                  popups.map((p) => {
+                    const ctr = (p.impressions_count || 0) > 0
+                      ? (((p.clicks_count || 0) / p.impressions_count) * 100).toFixed(1)
+                      : '0.0';
+
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          background: '#141414',
+                          border: `1px solid ${p.active ? '#333' : '#222'}`,
+                          borderRadius: '12px',
+                          padding: '1.5rem',
+                          display: 'flex',
+                          gap: '1.5rem',
+                          alignItems: 'flex-start',
+                          opacity: p.active ? 1 : 0.65,
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {/* Miniatura de la imagen */}
+                        <div
+                          style={{
+                            width: '140px',
+                            height: '110px',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            background: '#0a0a0a',
+                            flexShrink: 0,
+                            border: '1px solid #2a2a2a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {p.image_url ? (
+                            <img
+                              src={p.image_url}
+                              alt={p.title}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <ImageIcon size={32} color="#555" />
+                          )}
+                        </div>
+
+                        {/* Información del Pop-up */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                            <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, fontWeight: 700 }}>
+                              {p.title}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePopupActive(p)}
+                              style={{
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '50px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                border: `1px solid ${p.active ? '#22c55e' : '#555'}`,
+                                background: p.active ? 'rgba(34,197,94,0.15)' : '#262626',
+                                color: p.active ? '#4ade80' : '#888',
+                                cursor: 'pointer',
+                              }}
+                              title="Haz clic para activar o pausar este pop-up"
+                            >
+                              {p.active ? '● En Vivo' : '○ Pausado'}
+                            </button>
+                            <span
+                              style={{
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                background: '#1e1e1e',
+                                color: '#ccc',
+                                border: '1px solid #333',
+                              }}
+                            >
+                              {p.frequency === 'once_per_session' ? '1 vez por sesión' : p.frequency === 'once_per_day' ? '1 vez al día' : 'Siempre'}
+                            </span>
+                            <span
+                              style={{
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                background: 'rgba(245,197,24,0.1)',
+                                color: 'var(--gold)',
+                                border: '1px solid rgba(245,197,24,0.3)',
+                              }}
+                            >
+                              Enlace: {p.link_type}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.82rem', color: '#aaa', marginTop: '0.3rem' }}>
+                            Destino: <strong style={{ color: '#fff' }}>{p.link_value}</strong>
+                          </div>
+
+                          {/* Páginas y Vigencia */}
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.6rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#888' }}>Páginas:</span>
+                            {p.pages?.map((pg) => (
+                              <span
+                                key={pg}
+                                style={{
+                                  background: '#222',
+                                  color: '#ddd',
+                                  fontSize: '0.7rem',
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid #333',
+                                }}
+                              >
+                                {pg === '*' ? 'Todas las páginas públicas' : pg === 'home' ? 'Inicio (Home)' : pg}
+                              </span>
+                            ))}
+                            {(p.starts_at || p.ends_at) && (
+                              <span style={{ fontSize: '0.75rem', color: '#888', marginLeft: '0.5rem' }}>
+                                Vigencia: {p.starts_at ? p.starts_at.slice(0, 10) : 'Inicio'} al {p.ends_at ? p.ends_at.slice(0, 10) : 'Indefinido'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Métricas de Rendimiento */}
+                          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem', paddingTop: '0.6rem', borderTop: '1px solid #222', fontSize: '0.8rem', color: '#bbb' }}>
+                            <span>👁️ <strong>{p.impressions_count || 0}</strong> impresiones</span>
+                            <span>🖱️ <strong>{p.clicks_count || 0}</strong> clics</span>
+                            <span>📈 CTR: <strong style={{ color: 'var(--gold)' }}>{ctr}%</strong></span>
+                          </div>
+                        </div>
+
+                        {/* Botones de acción */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewPopup(p)}
+                            className="btn btn--sm"
+                            style={{ background: '#1c1c1c', color: 'var(--gold)', border: '1px solid #444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+                            title="Previsualizar cómo se verá en la web en vivo"
+                          >
+                            <Eye size={13} />
+                            <span>Previsualizar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditPopup(p)}
+                            className="btn btn--ghost btn--sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+                            title="Editar parámetros del pop-up"
+                          >
+                            <Edit size={13} />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResetPopupStats(p.id)}
+                            className="btn btn--ghost btn--sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#bbb' }}
+                            title="Restablecer conteo de impresiones y clics"
+                          >
+                            <RefreshCw size={13} />
+                            <span>Reset Métricas</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePopup(p.id)}
+                            className="btn btn--ghost btn--sm"
+                            style={{ borderColor: '#7f1d1d', color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}
+                            title="Eliminar este pop-up"
+                          >
+                            <Trash2 size={13} />
+                            <span>Eliminar</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Modal de Creación / Edición de Pop-up (Bloque 9) */}
+              {showPopupModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(0,0,0,0.85)',
+                    backdropFilter: 'blur(5px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1.5rem',
+                  }}
+                  onClick={() => setShowPopupModal(false)}
+                >
+                  <div
+                    style={{
+                      background: '#161616',
+                      border: '2px solid var(--gold)',
+                      borderRadius: '16px',
+                      maxWidth: '620px',
+                      width: '100%',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                      padding: '2rem',
+                      boxShadow: '0 25px 50px rgba(0,0,0,0.8)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #282828', paddingBottom: '0.8rem' }}>
+                      <h3 style={{ color: 'var(--gold)', margin: 0, fontSize: '1.3rem' }}>
+                        {editingPopupId ? 'Editar Pop-up Promocional' : 'Nuevo Pop-up Promocional'}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowPopupModal(false)}
+                        style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSavePopup} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                          Título del Pop-up <span style={{ color: 'var(--gold)' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej. ¡Inscripciones Abiertas - Torneo Sabaneta 2026!"
+                          value={popupForm.title}
+                          onChange={(e) => setPopupForm({ ...popupForm, title: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                          Imagen de Banner o Flyer <span style={{ color: 'var(--gold)' }}>*</span>
+                        </label>
+                        <FileUploadField
+                          bucket="gallery"
+                          mode="public"
+                          folder="popups"
+                          accept="image/*"
+                          label="Subir flyer / banner (WebP, PNG, JPG)"
+                          onUploaded={(url) => setPopupForm({ ...popupForm, image_url: url })}
+                        />
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <input
+                            type="text"
+                            required
+                            placeholder="O ingresa una URL de imagen (/assets/img/...)"
+                            value={popupForm.image_url}
+                            onChange={(e) => setPopupForm({ ...popupForm, image_url: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#202020', border: '1px solid #444', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Tipo de Enlace
+                          </label>
+                          <select
+                            value={popupForm.link_type}
+                            onChange={(e) => setPopupForm({ ...popupForm, link_type: e.target.value as PopupLinkType })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          >
+                            <option value="internal_page">Página Interna (ej: /torneos)</option>
+                            <option value="external_url">URL Externa (ej: https://...)</option>
+                            <option value="form">Formulario (ej: /afiliarse)</option>
+                            <option value="document">Descarga de Documento</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Destino del Clic
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="/torneos o /afiliarse o https://..."
+                            value={popupForm.link_value}
+                            onChange={(e) => setPopupForm({ ...popupForm, link_value: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Frecuencia de Despliegue
+                          </label>
+                          <select
+                            value={popupForm.frequency}
+                            onChange={(e) => setPopupForm({ ...popupForm, frequency: e.target.value as PopupFrequency })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          >
+                            <option value="once_per_session">Una vez por sesión del navegador (Recomendado)</option>
+                            <option value="once_per_day">Una vez al día por usuario</option>
+                            <option value="always">Siempre / en cada visita</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.3rem' }}>
+                            Estado Inicial
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', background: '#202020', borderRadius: '8px', border: '1px solid #444', color: '#fff', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={popupForm.active}
+                              onChange={(e) => setPopupForm({ ...popupForm, active: e.target.checked })}
+                            />
+                            <span>Activo inmediatamente</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Páginas Objetivo */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginBottom: '0.4rem' }}>
+                          Páginas donde se mostrará:
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                          {[
+                            { id: '*', label: 'Todas las públicas' },
+                            { id: 'home', label: 'Inicio (Home)' },
+                            { id: '/torneos', label: 'Torneos' },
+                            { id: '/clases', label: 'Clases' },
+                            { id: '/blog', label: 'Blog' },
+                            { id: '/nosotros', label: 'Nosotros' },
+                          ].map((pageOption) => {
+                            const isChecked = popupForm.pages.includes(pageOption.id);
+                            return (
+                              <label
+                                key={pageOption.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  background: isChecked ? 'rgba(245,197,24,0.1)' : '#1e1e1e',
+                                  border: `1px solid ${isChecked ? 'var(--gold)' : '#333'}`,
+                                  padding: '0.4rem 0.6rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer',
+                                  color: isChecked ? 'var(--gold)' : '#aaa',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setPopupForm({ ...popupForm, pages: [...popupForm.pages, pageOption.id] });
+                                    } else {
+                                      setPopupForm({ ...popupForm, pages: popupForm.pages.filter((p) => p !== pageOption.id) });
+                                    }
+                                  }}
+                                />
+                                <span>{pageOption.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Rango de Vigencia */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                            Fecha de Inicio (Opcional)
+                          </label>
+                          <input
+                            type="date"
+                            value={popupForm.starts_at}
+                            onChange={(e) => setPopupForm({ ...popupForm, starts_at: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                            Fecha de Vencimiento (Opcional)
+                          </label>
+                          <input
+                            type="date"
+                            value={popupForm.ends_at}
+                            onChange={(e) => setPopupForm({ ...popupForm, ends_at: e.target.value })}
+                            style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', background: '#202020', border: '1px solid #444', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                        <button type="button" onClick={() => setShowPopupModal(false)} className="btn btn--ghost btn--sm">
+                          Cancelar
+                        </button>
+                        <button type="submit" className="btn btn--primary btn--sm">
+                          {editingPopupId ? 'Guardar Cambios' : 'Crear y Publicar Pop-up'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de Previsualización en Vivo de Pop-up */}
+              {previewPopup && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 10000,
+                    background: 'rgba(0,0,0,0.85)',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1.2rem',
+                  }}
+                  onClick={() => setPreviewPopup(null)}
+                >
+                  <div
+                    style={{
+                      background: '#161616',
+                      border: '2px solid var(--gold)',
+                      borderRadius: '16px',
+                      maxWidth: '520px',
+                      width: '100%',
+                      overflow: 'hidden',
+                      boxShadow: '0 25px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(245, 197, 24, 0.25)',
+                      position: 'relative',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ background: '#0a0a0a', padding: '0.6rem 1rem', borderBottom: '1px solid #282828', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase' }}>
+                        [Vista Previa de Pop-up]
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPopup(null)}
+                        style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ position: 'relative', maxHeight: '380px', overflow: 'hidden', background: '#0a0a0a' }}>
+                      {previewPopup.image_url && (
+                        <img
+                          src={previewPopup.image_url}
+                          alt={previewPopup.title}
+                          style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ padding: '1.2rem 1.5rem', background: '#161616' }}>
+                      <h4 style={{ color: '#fff', fontSize: '1.15rem', margin: '0 0 0.8rem', fontWeight: 700 }}>
+                        {previewPopup.title}
+                      </h4>
+                      <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPopup(null)}
+                          className="btn btn--ghost btn--sm"
+                        >
+                          Cerrar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerNotice(`Acción simulada: Redirigiendo a ${previewPopup.link_value}`);
+                            setPreviewPopup(null);
+                          }}
+                          className="btn btn--primary btn--sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                          <span>Participar / Ver Más</span>
+                          <ExternalLink size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

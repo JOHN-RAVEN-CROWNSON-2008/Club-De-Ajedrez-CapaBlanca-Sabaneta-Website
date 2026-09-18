@@ -10,7 +10,7 @@ import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
   Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users,
-  Megaphone, X, Globe, ExternalLink
+  Megaphone, X, Globe, ExternalLink, MessageCircle
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -298,6 +298,69 @@ export const MembersDashboardView: React.FC = () => {
 
   if (!user) {
     return <MemberLoginView />;
+  }
+
+  if (user.estado === 'pending') {
+    return (
+      <div style={{ paddingTop: 'calc(var(--content-offset) + 2rem)', background: '#0a0a0a', color: '#fff', minHeight: '90vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: '1rem', paddingBottom: '4rem' }}>
+        <div style={{ maxWidth: '580px', width: '100%', background: '#141414', border: '1px solid #333', borderRadius: '16px', padding: '2.5rem', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(245, 197, 24, 0.12)', border: '2px solid var(--gold)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+            <Clock size={36} />
+          </div>
+          <span style={{ background: 'rgba(245, 197, 24, 0.15)', color: 'var(--gold)', padding: '0.3rem 0.8rem', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Solicitud en Revisión
+          </span>
+          <h2 style={{ fontSize: '1.6rem', color: '#fff', fontWeight: 800, margin: '1rem 0 0.6rem' }}>
+            Hola, {user.nombre} {user.apellido}
+          </h2>
+          <p style={{ color: '#ccc', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            Tu solicitud de afiliación al <strong>Club Deportivo de Ajedrez Capablanca Sabaneta</strong> ha sido radicada exitosamente y se encuentra en proceso de revisión por parte de la Comisión Técnica y de Admisiones.
+          </p>
+
+          <div style={{ background: '#181818', border: '1px solid #282828', borderRadius: '12px', padding: '1.2rem', textAlign: 'left', marginBottom: '2rem', fontSize: '0.88rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', borderBottom: '1px solid #252525', paddingBottom: '0.5rem' }}>
+              <span style={{ color: '#888' }}>Usuario:</span>
+              <strong style={{ color: '#fff' }}>@{user.usuario}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', borderBottom: '1px solid #252525', paddingBottom: '0.5rem' }}>
+              <span style={{ color: '#888' }}>Correo registrado:</span>
+              <strong style={{ color: '#fff' }}>{user.correo}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', borderBottom: '1px solid #252525', paddingBottom: '0.5rem' }}>
+              <span style={{ color: '#888' }}>Categoría solicitada:</span>
+              <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{user.categoria_ajedrez || 'Iniciación'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#888' }}>Estado actual:</span>
+              <span style={{ color: '#f59e0b', fontWeight: 700 }}>Pendiente de Aprobación</span>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: '#888', lineHeight: 1.5, marginBottom: '2rem' }}>
+            Una vez validada tu solicitud por la coordinación, recibirás la confirmación y tendrás acceso inmediato al repositorio exclusivo de documentos, análisis en Lichess y carnet digital oficial.
+          </p>
+
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="https://wa.me/573002545835?text=Hola,%20acabo%20de%20registrarme%20en%20el%20portal%20y%20quisiera%20consultar%20el%20estado%20de%20mi%20afiliación."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn--primary btn--sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <MessageCircle size={15} /> Consultar por WhatsApp
+            </a>
+            <button
+              onClick={() => logout().then(() => navigate('/'))}
+              className="btn btn--ghost btn--sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: '#444' }}
+            >
+              <LogOut size={15} /> Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const filteredDocs = documents.filter((doc) => {

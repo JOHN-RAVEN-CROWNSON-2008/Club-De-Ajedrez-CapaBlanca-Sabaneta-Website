@@ -38,11 +38,7 @@ export const MemberRegisterView: React.FC = () => {
     setLoading(false);
 
     if (res.success) {
-      if (res.emailConfirmationRequired) {
-        setIsRegistered(true);
-      } else {
-        navigate('/afiliados');
-      }
+      setIsRegistered(true);
     } else {
       setError(res.error || 'Error al registrarte');
     }
@@ -181,7 +177,12 @@ export const MemberRegisterView: React.FC = () => {
                 <ShieldCheck size={14} />
                 <span>Tratamiento de Datos Personales (Habeas Data)</span>
               </div>
-              Los datos suministrados serán tratados exclusivamente con fines de registro deportivo, carnetización, control pedagógico y comunicaciones institucionales por el <strong>Club Deportivo de Ajedrez Capablanca Sabaneta</strong> (Personería Jurídica Inder Sabaneta Res. 042). Puedes solicitar su actualización o rectificación en cualquier momento.
+              <p style={{ margin: '0 0 0.5rem' }}>
+                Los datos suministrados serán tratados exclusivamente con fines de registro deportivo, carnetización, control pedagógico y comunicaciones institucionales por el <strong>Club Deportivo de Ajedrez Capablanca Sabaneta</strong> (Personería Jurídica Inder Sabaneta Res. 042). Puedes solicitar su actualización o rectificación en cualquier momento.
+              </p>
+              <Link to="/politica-de-datos" target="_blank" style={{ color: 'var(--gold)', textDecoration: 'underline', fontWeight: 600 }}>
+                Consulta aquí el texto completo de nuestra Política de Tratamiento de Datos (Ley 1581 de 2012)
+              </Link>
             </div>
 
             <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -297,6 +298,14 @@ export const MemberRegisterView: React.FC = () => {
                   <option value="Adultos & Aficionados">Adultos & Aficionados</option>
                   <option value="Alta Competencia / Elo FIDE">Alta Competencia / Elo FIDE</option>
                 </select>
+              </div>
+
+              <div style={{ fontSize: '0.78rem', color: '#999', lineHeight: 1.5, background: '#181818', padding: '0.85rem', borderRadius: '8px', border: '1px solid #282828' }}>
+                <Shield size={14} color="var(--gold)" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '5px' }} />
+                Al hacer clic en registrarte, autorizas al <strong>Club Capablanca Sabaneta</strong> a tratar tus datos conforme a nuestra{' '}
+                <Link to="/politica-de-datos" target="_blank" style={{ color: 'var(--gold)', textDecoration: 'underline' }}>
+                  Política de Tratamiento de Datos (Ley 1581 de 2012)
+                </Link>. En caso de deportistas menores de edad, declaras contar con la previa autorización de sus padres o representante legal.
               </div>
 
               <button
