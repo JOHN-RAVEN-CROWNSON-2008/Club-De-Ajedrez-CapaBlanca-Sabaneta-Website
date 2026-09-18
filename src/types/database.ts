@@ -241,3 +241,62 @@ export interface MemberPublicDirectoryItem {
   elo_rating?: number;
   estado: UserStatus;
 }
+
+// MODO AI: Proveedores y configuración
+export type AIProvider = 
+  | 'gemini' 
+  | 'anthropic' 
+  | 'openai' 
+  | 'qwen' 
+  | 'zai' 
+  | 'deepseek' 
+  | 'grok' 
+  | 'xiaomi' 
+  | 'kimi' 
+  | 'tencent';
+
+export interface AIProviderSetting {
+  id: string;
+  provider: AIProvider;
+  enabled: boolean;
+  default_model: string;
+  secret_ref: string;
+  usage_scope: string[];
+  monthly_token_budget?: number;
+  updated_by?: string;
+  updated_at?: string;
+}
+
+// Editor de Sitio Ampliado: Bloques Dinámicos de Contenido
+export type ContentBlockPage = 'home' | 'club' | 'programas' | 'torneos' | 'contacto' | 'galeria';
+export type ContentBlockValueType = 'text' | 'richtext' | 'image' | 'json';
+
+export interface ContentBlock {
+  id: string;
+  page: ContentBlockPage;
+  section_key: string;
+  value_type: ContentBlockValueType;
+  value: string;
+  updated_at?: string;
+}
+
+export interface AIProxyRequest {
+  feature?: 'blog_writer' | 'moderation' | 'web_editor' | 'general';
+  provider?: AIProvider;
+  prompt: string;
+  systemPrompt?: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+export interface AIProxyResponse {
+  success: boolean;
+  text?: string;
+  provider?: string;
+  model?: string;
+  feature?: string;
+  error?: string;
+  timestamp?: string;
+}
+

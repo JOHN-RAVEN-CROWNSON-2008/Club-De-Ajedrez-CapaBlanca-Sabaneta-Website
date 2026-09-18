@@ -8,20 +8,23 @@ import {
   INITIAL_SETTINGS, INITIAL_EVENTS, INITIAL_POSTS, INITIAL_DOCUMENTS,
   MOCK_MEMBER_PROFILE, MOCK_ADMIN_PROFILE, INITIAL_PAYMENTS, INITIAL_SCHEDULES,
   INITIAL_ANNOUNCEMENTS, INITIAL_MATCHES, INITIAL_GALLERY, INITIAL_REGISTRATIONS, INITIAL_MEMBERS,
-  INITIAL_ATTENDANCE, INITIAL_TROPHIES, INITIAL_APPLICATIONS
+  INITIAL_ATTENDANCE, INITIAL_TROPHIES, INITIAL_APPLICATIONS,
+  INITIAL_AI_PROVIDERS, INITIAL_CONTENT_BLOCKS
 } from '../../lib/initialData';
 import {
   SiteSettings, ClubEvent, Post, ClubDocument, UserProfile, ContactMessage,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
   GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus,
-  ClubTrophy, TrophyType, MembershipApplication, ApplicationStatus
+  ClubTrophy, TrophyType, MembershipApplication, ApplicationStatus,
+  AIProviderSetting, AIProvider, ContentBlock, ContentBlockPage, ContentBlockValueType
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
   Users, Mail, LogOut, Plus, Trash2, Save, CheckCircle2, AlertCircle,
   CreditCard, Calendar, Megaphone, Download, Search, Check, X,
   Swords, Eye, Camera, Award, Edit, CheckSquare, Database, Copy, Server, MessageCircle,
-  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2, Archive
+  UserCheck, UserX, ClipboardList, Crown, UserPlus, BarChart3, Medal, Wand2, Archive,
+  Sparkles, Bot, Cpu, Sliders, RefreshCw, Play
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -32,6 +35,7 @@ import { TournamentPairingModal } from '../../components/common/TournamentPairin
 import { ApplicationDetailModal } from '../../components/common/ApplicationDetailModal';
 import { PairingAthlete } from '../../lib/tournamentPairings';
 import { whatsappService } from '../../services/whatsappService';
+import { aiService } from '../../services/aiService';
 import { AdminLoginView } from '../auth/AdminLoginView';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
@@ -40,8 +44,36 @@ export const AdminDashboardView: React.FC = () => {
   const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState<
-    'overview' | 'content' | 'events' | 'blog' | 'documents' | 'gallery' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages'
+    'overview' | 'content' | 'ai' | 'events' | 'blog' | 'documents' | 'gallery' | 'members' | 'payments' | 'schedules' | 'announcements' | 'messages'
   >('overview');
+
+  // MODO AI & Proveedores LLM
+  const [aiModeActive, setAiModeActive] = useState<boolean>(() => aiService.isAIModeActive());
+  const [aiProviders, setAiProviders] = useState<AIProviderSetting[]>(INITIAL_AI_PROVIDERS);
+  const [selectedTestProvider, setSelectedTestProvider] = useState<AIProvider>('gemini');
+  const [testPrompt, setTestPrompt] = useState<string>('Redactar un mensaje pedagógico sobre la importancia del pensamiento estratégico y los valores del ajedrez en niños.');
+  const [testResult, setTestResult] = useState<string>('');
+  const [isTestingAI, setIsTestingAI] = useState<boolean>(false);
+  const [testLatency, setTestLatency] = useState<number | null>(null);
+
+  // Editor de Contenido Dinámico (content_blocks)
+  const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>(INITIAL_CONTENT_BLOCKS);
+  const [contentSubTab, setContentSubTab] = useState<'general' | 'blocks'>('general');
+  const [selectedContentPage, setSelectedContentPage] = useState<'all' | ContentBlockPage>('all');
+  const [contentBlockSearch, setContentBlockSearch] = useState<string>('');
+  const [showNewBlockModal, setShowNewBlockModal] = useState<boolean>(false);
+  const [newBlock, setNewBlock] = useState<{
+    page: ContentBlockPage;
+    section_key: string;
+    value_type: ContentBlockValueType;
+    value: string;
+  }>({
+    page: 'home',
+    section_key: '',
+    value_type: 'text',
+    value: '',
+  });
+  const [isOptimizingBlockId, setIsOptimizingBlockId] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
@@ -218,6 +250,12 @@ export const AdminDashboardView: React.FC = () => {
 
         const { data: msgs } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
         if (msgs && msgs.length > 0) setMessages(msgs as ContactMessage[]);
+
+        const provs = await aiService.getProviderSettings();
+        if (provs && provs.length > 0) setAiProviders(provs);
+
+        const blks = await aiService.getContentBlocks();
+        if (blks && blks.length > 0) setContentBlocks(blks);
       } catch (err) {
         console.error('Error al sincronizar datos de Supabase en Admin:', err);
       }
@@ -229,6 +267,112 @@ export const AdminDashboardView: React.FC = () => {
   const triggerNotice = (msg: string, type: 'success' | 'error' = 'success') => {
     setNotice({ msg, type });
     setTimeout(() => setNotice(null), 3500);
+  };
+
+  // MODO AI Handlers
+  const handleToggleAIMode = (active: boolean) => {
+    setAiModeActive(active);
+    aiService.setAIModeActive(active);
+    triggerNotice(active ? 'MODO AI activado globalmente' : 'MODO AI pausado');
+  };
+
+  const handleToggleProvider = async (id: string, currentEnabled: boolean) => {
+    const updated = await aiService.updateProviderSetting(id, { enabled: !currentEnabled });
+    if (updated) {
+      setAiProviders(aiProviders.map((p) => (p.id === id ? updated : p)));
+      triggerNotice(`Proveedor ${updated.provider} ${updated.enabled ? 'habilitado' : 'deshabilitado'}`);
+    }
+  };
+
+  const handleUpdateProviderModel = async (id: string, newModel: string) => {
+    const updated = await aiService.updateProviderSetting(id, { default_model: newModel });
+    if (updated) {
+      setAiProviders(aiProviders.map((p) => (p.id === id ? updated : p)));
+      triggerNotice(`Modelo por defecto para ${updated.provider} actualizado a ${newModel}`);
+    }
+  };
+
+  const handleRunAITest = async () => {
+    if (!testPrompt.trim()) return;
+    setIsTestingAI(true);
+    setTestResult('');
+    setTestLatency(null);
+    const start = performance.now();
+    try {
+      const activeProv = aiProviders.find((p) => p.provider === selectedTestProvider);
+      const res = await aiService.generateText({
+        provider: selectedTestProvider,
+        model: activeProv?.default_model,
+        prompt: testPrompt,
+        feature: 'general',
+      });
+      const end = performance.now();
+      setTestLatency(Math.round(end - start));
+      if (res.success && res.text) {
+        setTestResult(res.text);
+      } else {
+        setTestResult(`Error: ${res.error || 'No se pudo generar respuesta'}`);
+      }
+    } catch (err: any) {
+      setTestResult(`Excepción: ${err.message || err}`);
+    } finally {
+      setIsTestingAI(false);
+    }
+  };
+
+  // Content Blocks Handlers
+  const handleSaveContentBlock = async (block: ContentBlock) => {
+    const updated = await aiService.upsertContentBlock(block);
+    if (updated) {
+      setContentBlocks(contentBlocks.map((b) => (b.id === block.id ? updated : b)));
+      triggerNotice(`Bloque "${block.section_key}" guardado exitosamente`);
+    }
+  };
+
+  const handleCreateContentBlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBlock.section_key.trim()) return;
+    const created = await aiService.upsertContentBlock(newBlock);
+    if (created) {
+      setContentBlocks([...contentBlocks.filter((b) => !(b.page === created.page && b.section_key === created.section_key)), created]);
+      setShowNewBlockModal(false);
+      setNewBlock({ page: 'home', section_key: '', value_type: 'text', value: '' });
+      triggerNotice(`Bloque "${created.section_key}" añadido al CMS`);
+    }
+  };
+
+  const handleDeleteContentBlock = async (id: string, key: string) => {
+    if (!confirm(`¿Eliminar el bloque "${key}"?`)) return;
+    const ok = await aiService.deleteContentBlock(id);
+    if (ok) {
+      setContentBlocks(contentBlocks.filter((b) => b.id !== id));
+      triggerNotice(`Bloque "${key}" eliminado`);
+    }
+  };
+
+  const handleOptimizeBlockWithAI = async (block: ContentBlock) => {
+    setIsOptimizingBlockId(block.id);
+    try {
+      const prov = aiProviders.find((p) => p.enabled) || aiProviders[0];
+      const res = await aiService.generateText({
+        provider: prov.provider,
+        model: prov.default_model,
+        prompt: `Mejora y optimiza la siguiente redacción institucional para la sección "${block.section_key}" de la página "${block.page}" del Club de Ajedrez Capablanca de Sabaneta. Mantén un tono elegante, deportivo y claro, sin explicaciones adicionales:\n\n"${block.value}"`,
+        feature: 'web_editor',
+      });
+
+      if (res.success && res.text) {
+        const updated = await aiService.upsertContentBlock({ ...block, value: res.text });
+        if (updated) {
+          setContentBlocks(contentBlocks.map((b) => (b.id === block.id ? updated : b)));
+          triggerNotice(`Texto del bloque "${block.section_key}" optimizado con IA (${prov.provider})`);
+        }
+      }
+    } catch (err: any) {
+      triggerNotice(`Error al optimizar con IA: ${err.message || err}`, 'error');
+    } finally {
+      setIsOptimizingBlockId(null);
+    }
   };
 
   // Guardar configuración
@@ -1192,6 +1336,7 @@ export const AdminDashboardView: React.FC = () => {
           {[
             { id: 'overview', label: 'Resumen & Métricas', icon: <LayoutDashboard size={18} /> },
             { id: 'content', label: 'Editor del Sitio Web', icon: <Globe size={18} /> },
+            { id: 'ai', label: 'MODO AI & Modelos LLM', icon: <Sparkles size={18} /> },
             { id: 'events', label: 'Torneos & Eventos', icon: <Trophy size={18} /> },
             { id: 'blog', label: 'Blog & Noticias', icon: <BookOpen size={18} /> },
             { id: 'documents', label: 'Documentos Afiliados', icon: <FileText size={18} /> },
@@ -1508,80 +1653,598 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           )}
 
-          {/* 2. SECCIÓN: CONFIGURACIÓN WEB */}
+          {/* 2. SECCIÓN: EDITOR DEL SITIO WEB & CMS DINÁMICO */}
           {activeSection === 'content' && (
-            <div style={{ maxWidth: '800px' }}>
-              <h1 className="display display--gold" style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
-                Configuración del Sitio Web
-              </h1>
-              <p style={{ color: '#888', marginBottom: '2rem' }}>
-                Edita los datos de contacto, teléfonos, WhatsApp y textos generales de la landing pública
-              </p>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    Editor del Sitio Web & CMS Dinámico
+                  </h1>
+                  <p style={{ color: '#888', margin: '0.3rem 0 0' }}>
+                    Personaliza datos de contacto y administra los bloques de contenido institucional de cada página en tiempo real
+                  </p>
+                </div>
 
-              <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '12px', padding: '1.8rem' }}>
-                  <h3 style={{ fontSize: '1.1rem', color: 'var(--gold)', marginBottom: '1rem' }}>Datos de Contacto y Sede</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Teléfono visible</label>
-                      <input
-                        type="text"
-                        value={settings.telefono}
-                        onChange={(e) => setSettings({ ...settings, telefono: e.target.value })}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
-                      />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setContentSubTab('general')}
+                    style={{
+                      padding: '0.45rem 1rem',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      background: contentSubTab === 'general' ? 'var(--gold)' : '#1a1a1a',
+                      color: contentSubTab === 'general' ? '#000' : '#bbb',
+                      border: contentSubTab === 'general' ? '1px solid var(--gold)' : '1px solid #333',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Datos Generales (site_settings)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContentSubTab('blocks')}
+                    style={{
+                      padding: '0.45rem 1rem',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      background: contentSubTab === 'blocks' ? 'var(--gold)' : '#1a1a1a',
+                      color: contentSubTab === 'blocks' ? '#000' : '#bbb',
+                      border: contentSubTab === 'blocks' ? '1px solid var(--gold)' : '1px solid #333',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Bloques de Páginas (content_blocks) ({contentBlocks.length})
+                  </button>
+                </div>
+              </div>
+
+              {contentSubTab === 'general' && (
+                <div style={{ maxWidth: '800px' }}>
+                  <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '12px', padding: '1.8rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', color: 'var(--gold)', marginBottom: '1rem' }}>Datos de Contacto y Sede</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Teléfono visible</label>
+                          <input
+                            type="text"
+                            value={settings.telefono}
+                            onChange={(e) => setSettings({ ...settings, telefono: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>WhatsApp Oficial</label>
+                          <input
+                            type="text"
+                            value={settings.whatsapp}
+                            onChange={(e) => setSettings({ ...settings, whatsapp: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '1rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Dirección de la Sede</label>
+                        <input
+                          type="text"
+                          value={settings.sede}
+                          onChange={(e) => setSettings({ ...settings, sede: e.target.value })}
+                          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>WhatsApp Oficial</label>
-                      <input
-                        type="text"
-                        value={settings.whatsapp}
-                        onChange={(e) => setSettings({ ...settings, whatsapp: e.target.value })}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
-                      />
+
+                    <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '12px', padding: '1.8rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', color: 'var(--gold)', marginBottom: '1rem' }}>Mensajes Preconfigurados de WhatsApp</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Mensaje para Inscripciones</label>
+                          <input
+                            type="text"
+                            value={settings.mensaje_inscripcion}
+                            onChange={(e) => setSettings({ ...settings, mensaje_inscripcion: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Mensaje para Clase de Prueba</label>
+                          <input
+                            type="text"
+                            value={settings.mensaje_clase_prueba}
+                            onChange={(e) => setSettings({ ...settings, mensaje_clase_prueba: e.target.value })}
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn btn--primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
+                      <Save size={18} />
+                      <span>Guardar Cambios</span>
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {contentSubTab === 'blocks' && (
+                <div>
+                  {/* Barra de Filtros por Página y Búsqueda */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#121212', padding: '1rem', borderRadius: '12px', border: '1px solid #222', marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      {[
+                        { id: 'all', label: 'Todas las Páginas' },
+                        { id: 'home', label: 'Inicio' },
+                        { id: 'club', label: 'El Club' },
+                        { id: 'programas', label: 'Programas' },
+                        { id: 'torneos', label: 'Torneos' },
+                        { id: 'contacto', label: 'Contacto' },
+                        { id: 'galeria', label: 'Galería' },
+                      ].map((pg) => {
+                        const count = pg.id === 'all' ? contentBlocks.length : contentBlocks.filter((b) => b.page === pg.id).length;
+                        return (
+                          <button
+                            key={pg.id}
+                            type="button"
+                            onClick={() => setSelectedContentPage(pg.id as any)}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '20px',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              background: selectedContentPage === pg.id ? 'var(--gold)' : '#1a1a1a',
+                              color: selectedContentPage === pg.id ? '#000' : '#bbb',
+                              border: selectedContentPage === pg.id ? '1px solid var(--gold)' : '1px solid #333',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {pg.label} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={16} color="#777" style={{ position: 'absolute', left: '10px', top: '10px' }} />
+                        <input
+                          type="text"
+                          placeholder="Buscar sección o texto..."
+                          value={contentBlockSearch}
+                          onChange={(e) => setContentBlockSearch(e.target.value)}
+                          style={{
+                            padding: '0.5rem 0.8rem 0.5rem 2.2rem',
+                            borderRadius: '6px',
+                            background: '#1a1a1a',
+                            border: '1px solid #333',
+                            color: '#fff',
+                            fontSize: '0.85rem',
+                            minWidth: '220px',
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowNewBlockModal(true)}
+                        className="btn btn--primary btn--sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                      >
+                        <Plus size={16} />
+                        <span>Nuevo Bloque</span>
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Dirección de la Sede</label>
-                    <input
-                      type="text"
-                      value={settings.sede}
-                      onChange={(e) => setSettings({ ...settings, sede: e.target.value })}
-                      style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
-                    />
+                  {/* Lista de Bloques de Contenido */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                    {contentBlocks
+                      .filter((b) => selectedContentPage === 'all' || b.page === selectedContentPage)
+                      .filter((b) => {
+                        if (!contentBlockSearch.trim()) return true;
+                        const q = contentBlockSearch.toLowerCase();
+                        return b.section_key.toLowerCase().includes(q) || b.value.toLowerCase().includes(q);
+                      })
+                      .map((block) => (
+                        <div
+                          key={block.id}
+                          style={{
+                            background: '#141414',
+                            border: '1px solid #282828',
+                            borderRadius: '10px',
+                            padding: '1.2rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.8rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <span style={{ background: '#252525', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>
+                                {block.page}
+                              </span>
+                              <strong style={{ color: 'var(--gold)', fontFamily: 'monospace', fontSize: '0.92rem' }}>
+                                {block.section_key}
+                              </strong>
+                              <span style={{ fontSize: '0.72rem', color: '#777', border: '1px solid #333', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                Tipo: {block.value_type}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              {aiModeActive && (block.value_type === 'text' || block.value_type === 'richtext') && (
+                                <button
+                                  type="button"
+                                  disabled={isOptimizingBlockId === block.id}
+                                  onClick={() => handleOptimizeBlockWithAI(block)}
+                                  className="btn btn--ghost btn--sm"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    fontSize: '0.78rem',
+                                    color: 'var(--gold)',
+                                    borderColor: 'rgba(245, 197, 24, 0.4)',
+                                  }}
+                                  title="Optimizar redacción con el proveedor de IA activo"
+                                >
+                                  <Sparkles size={13} />
+                                  <span>{isOptimizingBlockId === block.id ? 'Optimizando...' : 'Mejorar con IA'}</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteContentBlock(block.id, block.section_key)}
+                                className="btn btn--sm"
+                                style={{ background: 'transparent', border: 'none', color: '#ff8a80', cursor: 'pointer', padding: '0.3rem' }}
+                                title="Eliminar bloque"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <textarea
+                            rows={block.value.length > 120 ? 4 : 2}
+                            value={block.value}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setContentBlocks(contentBlocks.map((b) => (b.id === block.id ? { ...b, value: val } : b)));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.7rem',
+                              borderRadius: '8px',
+                              background: '#1b1b1b',
+                              border: '1px solid #333',
+                              color: '#fff',
+                              fontSize: '0.9rem',
+                              fontFamily: block.value_type === 'json' ? 'monospace' : 'inherit',
+                              lineHeight: 1.5,
+                            }}
+                          />
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveContentBlock(block)}
+                              className="btn btn--primary btn--sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+                            >
+                              <Save size={14} />
+                              <span>Guardar Bloque</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2.1. SECCIÓN: MODO AI & PROVEEDORES LLM */}
+          {activeSection === 'ai' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(245, 197, 24, 0.1)', border: '1px solid var(--gold)', padding: '0.2rem 0.6rem', borderRadius: '50px', color: 'var(--gold)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    <Sparkles size={14} />
+                    <span>ORQUESTADOR MULTI-PROVEEDOR LLM · EDGE FUNCTIONS</span>
+                  </div>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>
+                    MODO AI & Modelos de Inteligencia Artificial
+                  </h1>
+                  <p style={{ color: '#888', margin: '0.3rem 0 0' }}>
+                    Configuración centralizada de proveedores LLM. Todas las solicitudes pasan por la Edge Function server-side sin exponer llaves privadas en el frontend.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAIMode(!aiModeActive)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      padding: '0.6rem 1.2rem',
+                      borderRadius: '8px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: aiModeActive ? '#15803d' : '#27272a',
+                      color: '#fff',
+                      boxShadow: aiModeActive ? '0 0 15px rgba(34, 197, 94, 0.4)' : 'none',
+                    }}
+                  >
+                    <Bot size={18} />
+                    <span>{aiModeActive ? 'MODO AI: ACTIVO (Habilitado)' : 'MODO AI: PAUSADO (Desactivado)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Tarjetas de Métricas Rápidas */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Estado Global</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: aiModeActive ? '#4ade80' : '#a1a1aa', marginTop: '0.3rem' }}>
+                    {aiModeActive ? '● En Línea' : '○ Pausado'}
+                  </div>
+                </div>
+                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Proveedores Activos</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gold)', marginTop: '0.3rem' }}>
+                    {aiProviders.filter((p) => p.enabled).length} / {aiProviders.length}
+                  </div>
+                </div>
+                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Proveedor Principal</span>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa', marginTop: '0.4rem', textTransform: 'capitalize' }}>
+                    {aiProviders.find((p) => p.enabled)?.provider || 'gemini'}
+                  </div>
+                </div>
+                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '10px', padding: '1.2rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase' }}>Seguridad de Llaves</span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#81c784', marginTop: '0.4rem' }}>
+                    ✓ 100% Serverless Secrets
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid de Proveedores LLM */}
+              <div style={{ marginBottom: '2.5rem' }}>
+                <h3 style={{ fontSize: '1.15rem', color: '#fff', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Cpu size={18} color="var(--gold)" />
+                  <span>Catálogo de Proveedores de LLM Soportados</span>
+                </h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                  {aiProviders.map((prov) => (
+                    <div
+                      key={prov.id}
+                      style={{
+                        background: '#131313',
+                        border: `1px solid ${prov.enabled ? 'rgba(245, 197, 24, 0.4)' : '#252525'}`,
+                        borderRadius: '12px',
+                        padding: '1.2rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ fontSize: '1.05rem', color: '#fff', textTransform: 'capitalize' }}>
+                            {prov.provider}
+                          </strong>
+                          <span style={{ display: 'block', fontSize: '0.72rem', color: '#777', fontFamily: 'monospace' }}>
+                            Secreto: {prov.secret_ref}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleProvider(prov.id, prov.enabled)}
+                          style={{
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '50px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: 'none',
+                            background: prov.enabled ? '#166534' : '#27272a',
+                            color: prov.enabled ? '#86efac' : '#a1a1aa',
+                          }}
+                        >
+                          {prov.enabled ? 'Habilitado ✓' : 'Inactivo'}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#aaa', marginBottom: '0.25rem' }}>
+                          Modelo por Defecto
+                        </label>
+                        <input
+                          type="text"
+                          value={prov.default_model}
+                          onChange={(e) => {
+                            const m = e.target.value;
+                            setAiProviders(aiProviders.map((p) => (p.id === prov.id ? { ...p, default_model: m } : p)));
+                          }}
+                          onBlur={(e) => handleUpdateProviderModel(prov.id, e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            background: '#1c1c1c',
+                            border: '1px solid #333',
+                            color: '#fff',
+                            fontSize: '0.82rem',
+                            fontFamily: 'monospace',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        {(prov.usage_scope || []).map((scope, sidx) => (
+                          <span
+                            key={sidx}
+                            style={{
+                              background: '#202020',
+                              color: '#bbb',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            #{scope}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Consola Interactiva de Pruebas (MODO AI Playground) */}
+              <div style={{ background: '#121212', border: '1px solid #282828', borderRadius: '12px', padding: '1.8rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.2rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', color: 'var(--gold)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Play size={17} />
+                      <span>Consola de Pruebas de MODO AI (Playground en Vivo)</span>
+                    </h3>
+                    <p style={{ color: '#888', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+                      Evalúa en tiempo real las respuestas y la latencia del proxy de Edge Function
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <label style={{ fontSize: '0.82rem', color: '#aaa' }}>Proveedor:</label>
+                    <select
+                      value={selectedTestProvider}
+                      onChange={(e) => setSelectedTestProvider(e.target.value as AIProvider)}
+                      style={{
+                        padding: '0.45rem 0.8rem',
+                        borderRadius: '6px',
+                        background: '#1c1c1c',
+                        border: '1px solid #333',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {aiProviders.map((p) => (
+                        <option key={p.provider} value={p.provider}>
+                          {p.provider} ({p.default_model}) {p.enabled ? '✓' : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={isTestingAI}
+                      onClick={handleRunAITest}
+                      className="btn btn--primary btn--sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                    >
+                      <Sparkles size={15} />
+                      <span>{isTestingAI ? 'Generando...' : 'Ejecutar Prueba con IA'}</span>
+                    </button>
                   </div>
                 </div>
 
-                <div style={{ background: '#121212', border: '1px solid #222', borderRadius: '12px', padding: '1.8rem' }}>
-                  <h3 style={{ fontSize: '1.1rem', color: 'var(--gold)', marginBottom: '1rem' }}>Mensajes Preconfigurados de WhatsApp</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Mensaje para Inscripciones</label>
-                      <input
-                        type="text"
-                        value={settings.mensaje_inscripcion}
-                        onChange={(e) => setSettings({ ...settings, mensaje_inscripcion: e.target.value })}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#aaa', marginBottom: '0.3rem' }}>Mensaje para Clase de Prueba</label>
-                      <input
-                        type="text"
-                        value={settings.mensaje_clase_prueba}
-                        onChange={(e) => setSettings({ ...settings, mensaje_clase_prueba: e.target.value })}
-                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
-                      />
-                    </div>
-                  </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                    Instrucción / Prompt de Prueba:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={testPrompt}
+                    onChange={(e) => setTestPrompt(e.target.value)}
+                    placeholder="Escribe una instrucción de prueba para el modelo..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      background: '#1a1a1a',
+                      border: '1px solid #333',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                    }}
+                  />
                 </div>
 
-                <button type="submit" className="btn btn--primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
-                  <Save size={18} />
-                  <span>Guardar Cambios</span>
-                </button>
-              </form>
+                {/* Sugerencias Rápidas de Prompt */}
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.2rem', fontSize: '0.75rem', color: '#777' }}>
+                  <span>Sugerencias:</span>
+                  {[
+                    'Redactar crónica sobre el torneo Blitz Capablanca',
+                    'Crear lema motivacional para semillero infantil',
+                    'Explicar la importancia del cálculo en los finales de torre',
+                  ].map((sug, sidx) => (
+                    <button
+                      key={sidx}
+                      type="button"
+                      onClick={() => setTestPrompt(sug)}
+                      style={{
+                        background: '#1e1e1e',
+                        border: '1px solid #333',
+                        color: 'var(--gold)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.72rem',
+                      }}
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Salida de la Prueba */}
+                {testResult && (
+                  <div style={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: '8px', padding: '1.2rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', borderBottom: '1px solid #222', paddingBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#81c784', fontWeight: 700 }}>
+                        RESPUESTA GENERADA EXITOSAMENTE {testLatency ? `(${testLatency} ms)` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(testResult);
+                          triggerNotice('Texto copiado al portapapeles');
+                        }}
+                        style={{
+                          background: '#222',
+                          border: '1px solid #333',
+                          color: 'var(--gold)',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.72rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                        }}
+                      >
+                        <Copy size={12} />
+                        <span>Copiar</span>
+                      </button>
+                    </div>
+                    <div style={{ color: '#eee', fontSize: '0.92rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {testResult}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -4681,6 +5344,129 @@ export const AdminDashboardView: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Crear Nuevo Bloque de Contenido */}
+      {showNewBlockModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '560px',
+              background: '#161616',
+              border: '1px solid #333',
+              borderRadius: '14px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+            }}
+          >
+            <div style={{ background: '#111', borderBottom: '1px solid #222', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>
+                Nuevo Bloque de Contenido Dinámico
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowNewBlockModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateContentBlock} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                  Página Destino
+                </label>
+                <select
+                  value={newBlock.page}
+                  onChange={(e) => setNewBlock({ ...newBlock, page: e.target.value as ContentBlockPage })}
+                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1f1f1f', border: '1px solid #333', color: '#fff', fontSize: '0.88rem' }}
+                >
+                  <option value="home">Inicio (home)</option>
+                  <option value="club">El Club (club)</option>
+                  <option value="programas">Programas de Formación (programas)</option>
+                  <option value="torneos">Torneos & Eventos (torneos)</option>
+                  <option value="contacto">Contacto Institucional (contacto)</option>
+                  <option value="galeria">Galería Multimedia (galeria)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                  Identificador de Sección (section_key)
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej. hero.titulo, mision.texto, faq.q3"
+                  value={newBlock.section_key}
+                  onChange={(e) => setNewBlock({ ...newBlock, section_key: e.target.value.toLowerCase().replace(/\s+/g, '.') })}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1f1f1f', border: '1px solid #333', color: '#fff', fontSize: '0.88rem', fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                  Tipo de Valor
+                </label>
+                <select
+                  value={newBlock.value_type}
+                  onChange={(e) => setNewBlock({ ...newBlock, value_type: e.target.value as ContentBlockValueType })}
+                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1f1f1f', border: '1px solid #333', color: '#fff', fontSize: '0.88rem' }}
+                >
+                  <option value="text">Texto Plano (text)</option>
+                  <option value="richtext">Texto Enriquecido / Párrafo (richtext)</option>
+                  <option value="image">URL de Imagen (image)</option>
+                  <option value="json">Estructura JSON (json)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '0.3rem' }}>
+                  Contenido Inicial
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Escribe o pega el contenido aquí..."
+                  value={newBlock.value}
+                  onChange={(e) => setNewBlock({ ...newBlock, value: e.target.value })}
+                  required
+                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', background: '#1f1f1f', border: '1px solid #333', color: '#fff', fontSize: '0.88rem', lineHeight: 1.5 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.8rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowNewBlockModal(false)}
+                  className="btn btn--ghost btn--sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn--primary btn--sm"
+                  style={{ fontWeight: 700 }}
+                >
+                  Crear Bloque
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import {
   SiteSettings, Post, ClubEvent, ClubDocument, GalleryItem, UserProfile,
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch, TournamentRegistration,
-  ClassAttendance, ClubTrophy, MembershipApplication
+  ClassAttendance, ClubTrophy, MembershipApplication, AIProviderSetting, ContentBlock
 } from '../types/database';
 
 export const INITIAL_SETTINGS: SiteSettings = {
@@ -625,6 +625,204 @@ export const INITIAL_APPLICATIONS: MembershipApplication[] = [
     created_at: '2026-09-10T18:45:00Z',
   }
 ];
+
+export const INITIAL_AI_PROVIDERS: AIProviderSetting[] = [
+  {
+    id: 'ai-prov-1',
+    provider: 'gemini',
+    enabled: true,
+    default_model: 'gemini-2.5-flash',
+    secret_ref: 'AI_KEY_GEMINI',
+    usage_scope: ['blog', 'moderacion', 'redaccion_web', 'general'],
+    monthly_token_budget: 150000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-2',
+    provider: 'anthropic',
+    enabled: false,
+    default_model: 'claude-3-5-haiku-20241022',
+    secret_ref: 'AI_KEY_ANTHROPIC',
+    usage_scope: ['blog', 'redaccion_web'],
+    monthly_token_budget: 100000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-3',
+    provider: 'openai',
+    enabled: false,
+    default_model: 'gpt-4o-mini',
+    secret_ref: 'AI_KEY_OPENAI',
+    usage_scope: ['blog', 'moderacion', 'general'],
+    monthly_token_budget: 100000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-4',
+    provider: 'deepseek',
+    enabled: false,
+    default_model: 'deepseek-chat',
+    secret_ref: 'AI_KEY_DEEPSEEK',
+    usage_scope: ['blog', 'general'],
+    monthly_token_budget: 100000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-5',
+    provider: 'grok',
+    enabled: false,
+    default_model: 'grok-beta',
+    secret_ref: 'AI_KEY_GROK',
+    usage_scope: ['blog', 'general'],
+    monthly_token_budget: 100000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-6',
+    provider: 'qwen',
+    enabled: false,
+    default_model: 'qwen-turbo',
+    secret_ref: 'AI_KEY_QWEN',
+    usage_scope: ['blog'],
+    monthly_token_budget: 80000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-7',
+    provider: 'kimi',
+    enabled: false,
+    default_model: 'moonshot-v1-8k',
+    secret_ref: 'AI_KEY_KIMI',
+    usage_scope: ['blog'],
+    monthly_token_budget: 80000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-8',
+    provider: 'zai',
+    enabled: false,
+    default_model: 'glm-4-flash',
+    secret_ref: 'AI_KEY_ZAI',
+    usage_scope: ['blog'],
+    monthly_token_budget: 80000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-9',
+    provider: 'tencent',
+    enabled: false,
+    default_model: 'hunyuan-lite',
+    secret_ref: 'AI_KEY_TENCENT',
+    usage_scope: ['blog'],
+    monthly_token_budget: 80000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+  {
+    id: 'ai-prov-10',
+    provider: 'xiaomi',
+    enabled: false,
+    default_model: 'miai-default',
+    secret_ref: 'AI_KEY_XIAOMI',
+    usage_scope: ['blog'],
+    monthly_token_budget: 80000,
+    updated_at: '2026-09-17T00:00:00Z',
+  },
+];
+
+export const INITIAL_CONTENT_BLOCKS: ContentBlock[] = [
+  {
+    id: 'cb-1',
+    page: 'home',
+    section_key: 'hero.badge',
+    value_type: 'text',
+    value: 'Club Oficial de Ajedrez Sabaneta · Aval Inder Res. 042',
+  },
+  {
+    id: 'cb-2',
+    page: 'home',
+    section_key: 'hero.title',
+    value_type: 'text',
+    value: 'Pasión, Estrategia y Disciplina en Cada Movimiento',
+  },
+  {
+    id: 'cb-3',
+    page: 'home',
+    section_key: 'hero.subtitle',
+    value_type: 'text',
+    value: 'Formamos campeones y fomentamos valores a través de la ciencia milenaria del ajedrez en el corazón de Sabaneta.',
+  },
+  {
+    id: 'cb-4',
+    page: 'home',
+    section_key: 'callout.phrase',
+    value_type: 'text',
+    value: '"El ajedrez es algo más que un juego; es una diversión intelectual que tiene algo de arte y mucho de ciencia." — José Raúl Capablanca',
+  },
+  {
+    id: 'cb-5',
+    page: 'club',
+    section_key: 'history.title',
+    value_type: 'text',
+    value: 'Más de una década cultivando el ajedrez en Sabaneta',
+  },
+  {
+    id: 'cb-6',
+    page: 'club',
+    section_key: 'mision.text',
+    value_type: 'text',
+    value: 'Fomentar la práctica, formación y competencia del ajedrez en Sabaneta y Antioquia, brindando un espacio inclusivo, formativo y de alto rendimiento.',
+  },
+  {
+    id: 'cb-7',
+    page: 'club',
+    section_key: 'vision.text',
+    value_type: 'text',
+    value: 'Consolidarnos como el club de ajedrez referente en el Valle de Aburrá por nuestra excelencia deportiva, pedagógica y humana.',
+  },
+  {
+    id: 'cb-8',
+    page: 'programas',
+    section_key: 'hero.subtitle',
+    value_type: 'text',
+    value: 'Metodología estructurada para todas las edades: semilleros infantiles, juveniles, adultos aficionados y entrenamiento federado.',
+  },
+  {
+    id: 'cb-9',
+    page: 'torneos',
+    section_key: 'hero.subtitle',
+    value_type: 'text',
+    value: 'Competencias oficiales bajo ritmos Blitz, Rápido y Clásico avaladas por la Liga de Ajedrez de Antioquia y la FIDE.',
+  },
+  {
+    id: 'cb-10',
+    page: 'contacto',
+    section_key: 'faq.q1',
+    value_type: 'text',
+    value: '¿Desde qué edad pueden ingresar los niños al semillero?',
+  },
+  {
+    id: 'cb-11',
+    page: 'contacto',
+    section_key: 'faq.a1',
+    value_type: 'text',
+    value: 'Recibimos niños y niñas a partir de los 5 años en nuestro programa de iniciación lúdica.',
+  },
+  {
+    id: 'cb-12',
+    page: 'contacto',
+    section_key: 'faq.q2',
+    value_type: 'text',
+    value: '¿Tienen clases virtuales para estudiantes fuera de Sabaneta?',
+  },
+  {
+    id: 'cb-13',
+    page: 'contacto',
+    section_key: 'faq.a2',
+    value_type: 'text',
+    value: 'Sí, contamos con módulos virtuales vía Zoom y Lichess con análisis interactivo de partidas.',
+  },
+];
+
 
 
 
