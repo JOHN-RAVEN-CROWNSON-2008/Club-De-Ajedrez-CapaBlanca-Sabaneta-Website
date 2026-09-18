@@ -31,6 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     async function initAuth() {
       if (!isConfigured) {
+        if (import.meta.env.PROD) {
+          console.warn('Supabase no está configurado en producción.');
+          setLoading(false);
+          return;
+        }
+
         // Modo sin conexión o credenciales de ejemplo: restaurar sesión mock si existe en localStorage
         const storedMock = localStorage.getItem('capablanca_mock_session');
         if (storedMock && mounted) {
@@ -356,7 +362,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Atajo de acceso demo (blindado exclusivamente para entorno local)
   const loginAsDemo = (demoRole: 'admin' | 'member') => {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (!isLocalhost && isConfigured) {
+    if (import.meta.env.PROD || (!isLocalhost && isConfigured)) {
       console.warn('Acceso demo bloqueado: no disponible en entorno de producción');
       return;
     }

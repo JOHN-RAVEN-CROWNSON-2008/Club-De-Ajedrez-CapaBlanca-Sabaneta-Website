@@ -83,35 +83,35 @@ verdad, de punta a punta.
 
 ---
 
-## 3. Ejecutar el esquema completo (`supabase_schema.sql`)
+## 3. Ejecutar el esquema o migraciones en Supabase
 
-1. En el panel de Supabase, ve a **SQL Editor** → **New query**.
-2. Abre el archivo [`supabase_schema.sql`](./supabase_schema.sql) de este
-   repositorio, cópialo **completo** y pégalo en el editor.
-3. Pulsa **Run**. El script es idempotente (usa `IF NOT EXISTS`,
-   `ON CONFLICT DO NOTHING/UPDATE` y `DROP POLICY IF EXISTS`), así que puedes
-   volver a ejecutarlo sin miedo si alguna vez necesitas reaplicarlo.
-4. Deberías ver `Success. No rows returned` (o similar). Si ves un error,
-   revisa que copiaste el archivo completo — el script crea tablas, funciones,
-   triggers, políticas RLS, **buckets de Storage** y datos semilla en ese
-   orden, y algunas sentencias dependen de las anteriores.
+Existen dos opciones según el estado de tu proyecto en Supabase:
 
-Lo que este script deja creado:
+- **Opción A (Instalación limpia desde cero):** Abre el archivo [`supabase_schema.sql`](./supabase_schema.sql) de este repositorio, cópialo **completo**, pégalo en **SQL Editor → New query** y pulsa **Run**.
+- **Opción B (Actualización / Consolidación de Parte II):** Si ya ejecutaste la Parte I, abre el archivo [`supabase_migrations/00_master_consolidation_parte_2.sql`](./supabase_migrations/00_master_consolidation_parte_2.sql), cópialo y ejecútalo en el SQL Editor para aplicar todas las mejoras y nuevas tablas como una unidad revisada.
+
+Ambos scripts son idempotentes (usan `IF NOT EXISTS`, `ON CONFLICT DO NOTHING/UPDATE` y `DROP POLICY IF EXISTS`), por lo que pueden re-ejecutarse con total seguridad.
+
+Lo que este esquema deja configurado:
 
 | Categoría | Contenido |
 |---|---|
-| Tablas | `profiles`, `site_settings`, `posts` (blog), `events` (torneos/calendario), `documents` (archivos/guías/resoluciones/actas), `tournament_registrations`, `contact_messages`, `gallery`, `membership_payments`, `class_schedules`, `club_announcements`, `tournament_matches`, `class_attendance`, `club_trophies`, `membership_applications` |
-| Seguridad | RLS activado en las 15 tablas, función `is_admin()`, políticas específicas por tabla y por rol |
-| Automatización | Trigger `on_auth_user_created` → crea el perfil automáticamente cuando alguien se registra |
-| Storage | Buckets `gallery` (público), `documents` (público) y `payment-receipts` (privado), con políticas de lectura/escritura por rol |
-| Datos iniciales | Configuración general del sitio, horarios de clase, un anuncio, 2 torneos de ejemplo con partidas, palmarés histórico y 3 solicitudes de afiliación de ejemplo |
+| Tablas (18) | `profiles`, `site_settings`, `posts`, `events`, `documents`, `tournament_registrations`, `contact_messages`, `gallery`, `membership_payments`, `class_schedules`, `club_announcements`, `tournament_matches`, `class_attendance`, `club_trophies`, `membership_applications`, `promo_popups`, `ai_provider_settings`, `content_blocks` |
+| Vistas Seguras | `public.member_public_directory` (expone nombre, categoría, Elo y estado sin revelar PII sensible como correos o teléfonos a consultas públicas) |
+| Seguridad RLS | RLS activado en todas las 18 tablas, función `is_admin()` (`SECURITY DEFINER STABLE`), lectura de perfiles restringida al propio usuario o admin (`auth.uid() = id OR is_admin()`) |
+| Automatización | Trigger `on_auth_user_created` con `search_path` seguro → crea el perfil en `public.profiles` al registrarse |
+| Storage (4 buckets) | `gallery` (público), `documents` (público), `popups` (público) y `payment-receipts` (privado), con políticas de lectura/escritura por rol |
+| Datos iniciales | Configuración de sitio, horarios, torneos, partidas PGN, palmarés, solicitudes de afiliación, proveedores de IA y bloques editables del CMS |
 
 ### 3.1 Verificar el Storage
 
-Ve a **Storage** en el panel de Supabase y confirma que aparecen tres buckets:
-`gallery`, `documents` (ambos con el ícono de "público") y
-`payment-receipts` (privado). Si no aparecen, vuelve a correr solo la sección
-**20. ALMACENAMIENTO** del script.
+Ve a **Storage** en el panel de Supabase y confirma que aparecen cuatro buckets:
+- `gallery` (público)
+- `documents` (público)
+- `popups` (público)
+- `payment-receipts` (privado)
+
+Si alguno no aparece, vuelve a correr la sección **20. ALMACENAMIENTO** de `supabase_schema.sql` o el Bloque 10 de `00_master_consolidation_parte_2.sql`.
 
 ---
 
@@ -261,17 +261,38 @@ Primero regístrate como un afiliado nuevo (o usa la cuenta creada en el paso
 
 ---
 
-## 9. Servicios opcionales (no son necesarios para lo anterior)
+## 9. Secretos de Supabase Edge Functions (Server-Side)
 
-- **Resend** (`VITE_RESEND_API_KEY`): envía el correo de bienvenida al
-  registrarse. Sin esta clave, el registro sigue funcionando normalmente,
-  simplemente no se envía el correo (revisa `src/services/resendService.ts`).
-- **WhatsApp Cloud API** (`VITE_WHATSAPP_API_TOKEN`,
-  `VITE_WHATSAPP_PHONE_NUMBER_ID`): sin configurarla, los botones de
-  WhatsApp del panel simplemente abren `wa.me` con el mensaje prellenado
-  (comportamiento normal de un link de WhatsApp, no requiere API).
+> [!IMPORTANT]
+> **Regla de oro de seguridad:** Las API keys sensibles de LLM (Gemini, OpenAI, Anthropic, DeepSeek, Grok, etc.), el token de Resend y el token de WhatsApp **NUNCA** deben incluirse como variables `VITE_*` en el cliente, ni almacenarse en tablas de la base de datos. Viven exclusivamente como **secretos en Supabase Edge Functions**.
 
-Ninguno de los dos bloquea las funcionalidades de la sección 8.
+Para configurar estos servicios en el servidor:
+
+```bash
+# 1. Instalar Supabase CLI y vincular el proyecto
+npx supabase login
+npx supabase link --project-ref tu-id-de-proyecto
+
+# 2. Configurar llaves de Inteligencia Artificial (MODO AI)
+npx supabase secrets set AI_KEY_GEMINI="AIzaSy..."
+npx supabase secrets set AI_KEY_OPENAI="sk-proj-..."
+npx supabase secrets set AI_KEY_ANTHROPIC="sk-ant-..."
+npx supabase secrets set AI_KEY_DEEPSEEK="sk-..."
+npx supabase secrets set AI_KEY_GROK="xai-..."
+
+# 3. Configurar secretos de mensajería y correos transaccionales
+npx supabase secrets set RESEND_API_KEY="re_..."
+npx supabase secrets set WHATSAPP_API_TOKEN="EAA..."
+npx supabase secrets set WHATSAPP_PHONE_NUMBER_ID="1234567890"
+
+# 4. Desplegar Edge Functions
+npx supabase functions deploy ai-proxy
+npx supabase functions deploy send-email
+npx supabase functions deploy send-whatsapp
+```
+
+- **MODO AI:** El panel de administración interactúa con la Edge Function `ai-proxy` autenticado como administrador; la función resuelve la llave internamente y llama al proveedor LLM sin exponer las credenciales al navegador.
+- **WhatsApp:** Si no se configuran los secretos de WhatsApp Cloud API, los botones del panel generan automáticamente enlaces universales `https://wa.me/...` con mensaje prellenado, sin requerir API externa.
 
 ---
 
@@ -299,18 +320,21 @@ como variables de entorno de build. Actualiza también **Site URL** y
 ## 11. Limitaciones conocidas (documentadas, no ocultas)
 
 - **Aprobar una solicitud de afiliación** solo cambia su estado a
-  `approved`; no crea la cuenta de acceso automáticamente (ver sección 0,
-  punto 2). El aspirante debe registrarse él mismo con el mismo correo. Si
-  más adelante quieres automatizar esto por completo (crear la cuenta y
-  enviar la contraseña inicial desde el panel), se necesita una Supabase Edge
-  Function con la `service_role` key en el servidor — esa clave nunca debe
-  vivir en el frontend.
-- Los buckets `gallery` y `documents` son **públicos**: cualquiera con el
-  enlace directo puede ver el archivo, aunque no aparezca listado si no está
-  publicado. No subas ahí documentos confidenciales (usa `payment-receipts`,
-  que es privado, como referencia de patrón si necesitas otro bucket
-  privado).
+  `approved` y guarda la vinculación opcional en `linked_profile_id`; no crea la cuenta de acceso automáticamente (ver sección 0,
+  punto 2). El aspirante debe registrarse él mismo con el mismo correo.
+- Los buckets `gallery`, `documents` y `popups` son **públicos**: cualquiera con el
+  enlace directo puede ver el archivo.
+- El bucket `payment-receipts` es **estrictamente privado**: los archivos se organizan por carpeta `{auth.uid()}/` y el panel de administración accede a ellos mediante **signed URLs** temporales de lectura.
 - Los archivos subidos a un formulario que se cancela antes de enviarlo
-  quedan huérfanos en el bucket (suben al elegir el archivo, no al enviar el
-  formulario). No afecta la operación diaria; si el volumen crece, conviene
-  un barrido periódico similar al de cualquier limpieza de Storage.
+  quedan huérfanos en el bucket. Si el volumen crece, se puede ejecutar una rutina periódica de limpieza de storage.
+
+---
+
+## 12. Auditoría Integral de Seguridad (Checklist de Bloque 15)
+
+- [x] **Cero llaves en cliente:** Solo `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` están en el cliente. Llaves de Resend, WhatsApp y LLMs operan tras Edge Functions.
+- [x] **Protección de Datos Personales (PII):** Consultas anónimas y públicas consultan exclusivamente la vista `member_public_directory`. La tabla `profiles` tiene RLS restringido a `auth.uid() = id OR is_admin()`.
+- [x] **Comprobantes Seguros:** El bucket `payment-receipts` no tiene lectura pública; utiliza short-lived signed URLs.
+- [x] **Protección Anti-Bot en Formularios Públicos:** Los formularios de contacto y solicitud de admisión cuentan con honeypot invisible y verificación de tiempo mínimo de llenado para bloquear bots automáticos sin afectar la UX.
+- [x] **Modo Mock Deshabilitado en Producción:** `AuthContext.tsx` bloquea el inicio de sesión falso en entornos productivos.
+- [x] **Integridad de Esquema:** `is_admin()` es `SECURITY DEFINER STABLE`. Todas las 18 tablas tienen RLS activo.

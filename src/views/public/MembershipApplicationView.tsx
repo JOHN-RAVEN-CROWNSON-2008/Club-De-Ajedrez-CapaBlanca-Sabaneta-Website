@@ -34,6 +34,8 @@ export const MembershipApplicationView: React.FC = () => {
     notes: '',
   });
 
+  const [honeypot, setHoneypot] = useState('');
+  const [formMountTime] = useState<number>(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [applicationCode, setApplicationCode] = useState('');
@@ -87,6 +89,17 @@ export const MembershipApplicationView: React.FC = () => {
     setLoading(true);
 
     const generatedCode = `SOL-CAPA-${Math.floor(100000 + Math.random() * 900000)}-2026`;
+
+    // Verificación anti-bot: honeypot lleno o envío instantáneo (< 1200ms)
+    if (honeypot.trim() !== '' || Date.now() - formMountTime < 1200) {
+      console.warn('Envío de bot detectado y descartado preventivamente.');
+      setTimeout(() => {
+        setApplicationCode(generatedCode);
+        setSubmitted(true);
+        setLoading(false);
+      }, 500);
+      return;
+    }
 
     try {
       const applicationPayload = {
@@ -390,6 +403,19 @@ export const MembershipApplicationView: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ background: '#ffffff', borderRadius: '20px', padding: '2.5rem', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+            {/* Honeypot anti-bot invisible */}
+            <div style={{ display: 'none', position: 'absolute', left: '-9999px', opacity: 0 }} aria-hidden="true">
+              <label htmlFor="_bot_trap">No llenar este campo</label>
+              <input
+                type="text"
+                id="_bot_trap"
+                name="_bot_trap"
+                value={honeypot}
+                onChange={e => setHoneypot(e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
             
             {/* Sección 1: Datos Personales */}
             <div style={{ marginBottom: '2.5rem' }}>

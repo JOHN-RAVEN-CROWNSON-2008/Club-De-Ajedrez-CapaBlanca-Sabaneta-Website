@@ -419,7 +419,11 @@ ALTER TABLE public.promo_popups ENABLE ROW LEVEL SECURITY;
 -- ==============================================================================
 -- Profiles
 DROP POLICY IF EXISTS "Perfiles lectura autenticados" ON public.profiles;
-CREATE POLICY "Perfiles lectura autenticados" ON public.profiles FOR SELECT USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Perfiles lectura propio o admin" ON public.profiles;
+CREATE POLICY "Perfiles lectura propio o admin" ON public.profiles
+    FOR SELECT
+    TO authenticated
+    USING (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Usuarios editan propio perfil" ON public.profiles;
 CREATE POLICY "Usuarios editan propio perfil" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
@@ -645,7 +649,7 @@ END $$;
 
 ALTER TABLE public.documents
     ADD CONSTRAINT documents_category_check
-    CHECK (category IN ('General', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares', 'Resolución', 'Acta'));
+    CHECK (category IN ('General', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares', 'Guía', 'Formulario de inscripción', 'Resolución', 'Acta'));
 
 -- ==============================================================================
 -- 20. ALMACENAMIENTO (SUPABASE STORAGE): BUCKETS Y POLÍTICAS
@@ -653,11 +657,13 @@ ALTER TABLE public.documents
 -- gallery            -> fotografías del club (público, cualquiera puede ver la URL)
 -- documents          -> archivos, guías, reglamentos, resoluciones y actas (público)
 -- payment-receipts   -> soportes de pago de afiliados (privado, solo dueño + admin)
+-- popups             -> imágenes y banners promocionales administrables (público)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES
     ('gallery', 'gallery', TRUE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
     ('documents', 'documents', TRUE, 15728640, ARRAY['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/png', 'image/jpeg', 'text/plain']),
-    ('payment-receipts', 'payment-receipts', FALSE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
+    ('payment-receipts', 'payment-receipts', FALSE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'application/pdf']),
+    ('popups', 'popups', TRUE, 15728640, ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 ON CONFLICT (id) DO UPDATE SET
     public = EXCLUDED.public,
     file_size_limit = EXCLUDED.file_size_limit,
@@ -711,6 +717,23 @@ CREATE POLICY "receipts_owner_or_admin_select" ON storage.objects FOR SELECT
 DROP POLICY IF EXISTS "receipts_admin_delete" ON storage.objects;
 CREATE POLICY "receipts_admin_delete" ON storage.objects FOR DELETE
     USING (bucket_id = 'payment-receipts' AND public.is_admin());
+
+-- Popups promocionales: lectura pública, escritura exclusiva para administradores.
+DROP POLICY IF EXISTS "popups_public_read" ON storage.objects;
+CREATE POLICY "popups_public_read" ON storage.objects FOR SELECT
+    USING (bucket_id = 'popups');
+
+DROP POLICY IF EXISTS "popups_admin_insert" ON storage.objects;
+CREATE POLICY "popups_admin_insert" ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'popups' AND public.is_admin());
+
+DROP POLICY IF EXISTS "popups_admin_update" ON storage.objects;
+CREATE POLICY "popups_admin_update" ON storage.objects FOR UPDATE
+    USING (bucket_id = 'popups' AND public.is_admin());
+
+DROP POLICY IF EXISTS "popups_admin_delete" ON storage.objects;
+CREATE POLICY "popups_admin_delete" ON storage.objects FOR DELETE
+    USING (bucket_id = 'popups' AND public.is_admin());
 
 -- ==============================================================================
 -- 16. TABLA: ai_provider_settings (Configuración MODO AI multi-proveedor)

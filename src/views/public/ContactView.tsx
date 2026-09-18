@@ -12,12 +12,24 @@ export const ContactView: React.FC = () => {
     subject: 'Inscripción a Clases',
     message: '',
   });
+  const [honeypot, setHoneypot] = useState('');
+  const [formMountTime] = useState<number>(() => Date.now());
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Verificación anti-bot: honeypot lleno o envío instantáneo (< 1200ms)
+    if (honeypot.trim() !== '' || Date.now() - formMountTime < 1200) {
+      console.warn('Envío de bot detectado y descartado preventivamente.');
+      setTimeout(() => {
+        setSubmitted(true);
+        setLoading(false);
+      }, 500);
+      return;
+    }
 
     try {
       if (isSupabaseConfigured()) {
@@ -122,6 +134,20 @@ export const ContactView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                {/* Honeypot anti-bot invisible */}
+                <div style={{ display: 'none', position: 'absolute', left: '-9999px', opacity: 0 }} aria-hidden="true">
+                  <label htmlFor="_gotcha">No llenar este campo</label>
+                  <input
+                    type="text"
+                    id="_gotcha"
+                    name="_gotcha"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.4rem' }}>
                     Nombre completo *
