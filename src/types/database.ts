@@ -229,6 +229,15 @@ export interface MembershipApplication {
   created_at: string;
 }
 
-
-
-
+// Vista pública segura para validación de certificados y escalafón sin exponer datos personales
+export interface MemberPublicDirectoryItem {
+  id: string;
+  nombre: string;
+  apellido: string;
+  usuario?: string;
+  ciudad?: string;
+  categoria_ajedrez?: string;
+  fide_id?: string;
+  elo_rating?: number;
+  estado: UserStatus;
+}

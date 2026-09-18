@@ -9,10 +9,11 @@ interface AuthContextType {
   role: UserRole | null;
   loading: boolean;
   isConfigured: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (data: { email: string; password: string; nombre: string; apellido: string; telefono?: string; usuario?: string; categoria?: string }) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; isEmailNotConfirmed?: boolean }>;
+  register: (data: { email: string; password: string; nombre: string; apellido: string; telefono?: string; usuario?: string; categoria?: string }) => Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  resendConfirmationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
   loginAsDemo: (role: 'admin' | 'member') => void;
 }
@@ -42,24 +43,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // Si se accede directamente por el puerto 5181 (Admin) o ruta /admin en modo local, auto-iniciar con MOCK_ADMIN_PROFILE
-        const isPort5181 = window.location.port === '5181';
-        const isAdminPath = window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login';
-        if ((isPort5181 || isAdminPath) && mounted) {
-          setUser(MOCK_ADMIN_PROFILE);
-          localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_ADMIN_PROFILE));
-          setLoading(false);
-          return;
-        }
+        // Modo de desarrollo local: auto-iniciar solo si el host es localhost / 127.0.0.1
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (isLocalhost && mounted) {
+          // Si se accede directamente por el puerto 5181 (Admin) o ruta /admin en modo local, auto-iniciar con MOCK_ADMIN_PROFILE
+          const isPort5181 = window.location.port === '5181';
+          const isAdminPath = window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login';
+          if (isPort5181 || isAdminPath) {
+            setUser(MOCK_ADMIN_PROFILE);
+            localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_ADMIN_PROFILE));
+            setLoading(false);
+            return;
+          }
 
-        // Si se accede directamente por el puerto 5182 (Afiliados) o ruta /afiliados en modo local, auto-iniciar con MOCK_MEMBER_PROFILE
-        const isPort5182 = window.location.port === '5182';
-        const isMembersPath = window.location.pathname.startsWith('/afiliados');
-        if ((isPort5182 || isMembersPath) && mounted) {
-          setUser(MOCK_MEMBER_PROFILE);
-          localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_MEMBER_PROFILE));
-          setLoading(false);
-          return;
+          // Si se accede directamente por el puerto 5182 (Afiliados) o ruta /afiliados en modo local, auto-iniciar con MOCK_MEMBER_PROFILE
+          const isPort5182 = window.location.port === '5182';
+          const isMembersPath = window.location.pathname.startsWith('/afiliados');
+          if (isPort5182 || isMembersPath) {
+            setUser(MOCK_MEMBER_PROFILE);
+            localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_MEMBER_PROFILE));
+            setLoading(false);
+            return;
+          }
         }
 
         setLoading(false);
@@ -132,9 +137,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   // Iniciar sesión
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  // Iniciar sesión
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; isEmailNotConfirmed?: boolean }> => {
     if (!isConfigured) {
-      // Autenticación mock para modo demostración
+      // Autenticación mock para modo demostración (solo local)
       if (email.includes('admin')) {
         setUser(MOCK_ADMIN_PROFILE);
         localStorage.setItem('capablanca_mock_session', JSON.stringify(MOCK_ADMIN_PROFILE));
@@ -151,14 +157,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message?.toLowerCase() || '';
+        const isEmailNotConfirmed = msg.includes('email not confirmed') || (error as { code?: string }).code === 'email_not_confirmed';
+
+        if (isEmailNotConfirmed) {
+          return {
+            success: false,
+            error: 'Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada o carpeta de spam.',
+            isEmailNotConfirmed: true,
+          };
+        }
+        throw error;
+      }
+
       if (data.user) {
         await fetchProfile(data.user.id, data.user.email || '');
       }
       return { success: true };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Credenciales inválidas';
-      return { success: false, error: errorMsg };
+      const isEmailNotConfirmed = errorMsg.toLowerCase().includes('email not confirmed');
+      return {
+        success: false,
+        error: isEmailNotConfirmed
+          ? 'Tu correo electrónico aún no ha sido confirmado. Por favor revisa tu bandeja de entrada o carpeta de spam.'
+          : errorMsg,
+        isEmailNotConfirmed,
+      };
     }
   };
 
@@ -171,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     telefono?: string;
     usuario?: string;
     categoria?: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  }): Promise<{ success: boolean; error?: string; emailConfirmationRequired?: boolean }> => {
     if (!isConfigured) {
       const newMember: UserProfile = {
         id: 'usr-new-' + Date.now(),
@@ -189,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('capablanca_mock_session', JSON.stringify(newMember));
       // Enviar correo de bienvenida con Resend
       await resendService.sendWelcomeEmail(data.email, `${data.nombre} ${data.apellido}`);
-      return { success: true };
+      return { success: true, emailConfirmationRequired: false };
     }
 
     try {
@@ -202,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             apellido: data.apellido,
             telefono: data.telefono,
             usuario: data.usuario,
+            categoria: data.categoria,
             role: 'student',
           },
         },
@@ -209,15 +236,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      // Disparar correo de bienvenida mediante Resend
-      await resendService.sendWelcomeEmail(data.email, `${data.nombre} ${data.apellido}`);
+      // Si Supabase requiere confirmación de correo electrónico, session será null
+      const emailConfirmationRequired = !authData.session;
 
-      if (authData.user) {
+      // Enviar correo de bienvenida/notificación sin bloquear la respuesta
+      resendService.sendWelcomeEmail(data.email, `${data.nombre} ${data.apellido}`).catch((e) => {
+        console.warn('Disparo de correo de bienvenida:', e);
+      });
+
+      if (authData.session && authData.user) {
         await fetchProfile(authData.user.id, authData.user.email || '');
       }
-      return { success: true };
+
+      return { success: true, emailConfirmationRequired };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Error al registrar usuario';
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  // Reenviar correo de confirmación de registro
+  const resendConfirmationEmail = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isConfigured) {
+      console.info('[Reenvío Simulado] Correo de confirmación simulado para:', email);
+      return { success: true };
+    }
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Error al reenviar correo de confirmación';
       return { success: false, error: errorMsg };
     }
   };
@@ -278,8 +332,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Atajo de acceso demo (para pruebas rápidas de desarrollo)
+  // Atajo de acceso demo (blindado exclusivamente para entorno local)
   const loginAsDemo = (demoRole: 'admin' | 'member') => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalhost && isConfigured) {
+      console.warn('Acceso demo bloqueado: no disponible en entorno de producción');
+      return;
+    }
     const profile = demoRole === 'admin' ? MOCK_ADMIN_PROFILE : MOCK_MEMBER_PROFILE;
     setUser(profile);
     localStorage.setItem('capablanca_mock_session', JSON.stringify(profile));
@@ -296,6 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         resetPassword,
+        resendConfirmationEmail,
         updateProfile,
         loginAsDemo,
       }}

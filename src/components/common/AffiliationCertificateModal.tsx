@@ -1,20 +1,20 @@
 import React from 'react';
 import { X, Printer, Award, ShieldCheck } from 'lucide-react';
-import { UserProfile } from '../../types/database';
+import { UserProfile, MemberPublicDirectoryItem } from '../../types/database';
 
 interface AffiliationCertificateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  member: UserProfile | {
+  member: UserProfile | MemberPublicDirectoryItem | {
     id: string;
     nombre: string;
     apellido: string;
-    correo: string;
-    categoria_ajedrez?: string;
-    elo_rating?: number;
-    fide_id?: string;
-    ciudad?: string;
-    rol?: string;
+    correo?: string;
+    categoria_ajedrez?: string | null;
+    elo_rating?: number | null;
+    fide_id?: string | null;
+    ciudad?: string | null;
+    rol?: string | null;
     created_at?: string;
   };
 }

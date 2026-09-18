@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { User, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import { User, Lock, ArrowRight, ShieldCheck, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const MemberLoginView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isEmailUnconfirmed, setIsEmailUnconfirmed] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login, loginAsDemo, isConfigured } = useAuth();
+  const { login, loginAsDemo, isConfigured, resendConfirmationEmail } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsEmailUnconfirmed(false);
+    setResendStatus(null);
     setLoading(true);
 
     const res = await login(email, password);
@@ -23,6 +28,23 @@ export const MemberLoginView: React.FC = () => {
       navigate('/afiliados');
     } else {
       setError(res.error || 'Error al iniciar sesión');
+      setIsEmailUnconfirmed(Boolean(res.isEmailNotConfirmed));
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      setError('Por favor ingresa tu correo electrónico para reenviarte la confirmación.');
+      return;
+    }
+    setResendingEmail(true);
+    setResendStatus(null);
+    const res = await resendConfirmationEmail(email);
+    setResendingEmail(false);
+    if (res.success) {
+      setResendStatus('¡Enlace de confirmación enviado! Revisa tu bandeja de entrada y la carpeta de spam.');
+    } else {
+      setError(res.error || 'No se pudo reenviar el correo de confirmación.');
     }
   };
 
@@ -43,8 +65,69 @@ export const MemberLoginView: React.FC = () => {
         </div>
 
         {error && (
-          <div style={{ background: '#3e1b1b', border: '1px solid #b71c1c', color: '#ff8a80', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-            {error}
+          <div
+            style={{
+              background: isEmailUnconfirmed ? '#2a220e' : '#3e1b1b',
+              border: isEmailUnconfirmed ? '1px solid #b78103' : '1px solid #b71c1c',
+              color: isEmailUnconfirmed ? '#ffe082' : '#ff8a80',
+              padding: '1rem',
+              borderRadius: '10px',
+              fontSize: '0.88rem',
+              marginBottom: '1.5rem',
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
+              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px', color: isEmailUnconfirmed ? 'var(--gold)' : '#ff5252' }} />
+              <div style={{ width: '100%' }}>
+                <strong>{isEmailUnconfirmed ? 'Correo pendiente de confirmación' : 'Error de acceso'}</strong>
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.83rem' }}>{error}</p>
+                {isEmailUnconfirmed && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={resendingEmail}
+                    style={{
+                      marginTop: '0.8rem',
+                      background: 'var(--gold)',
+                      color: '#000',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      padding: '0.4rem 0.8rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Mail size={14} />
+                    <span>{resendingEmail ? 'Reenviando...' : 'Reenviar enlace de confirmación'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resendStatus && (
+          <div
+            style={{
+              background: '#112211',
+              border: '1px solid #2e7d32',
+              color: '#a5d6a7',
+              padding: '0.85rem 1rem',
+              borderRadius: '10px',
+              fontSize: '0.85rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <CheckCircle2 size={18} color="#81c784" />
+            <span>{resendStatus}</span>
           </div>
         )}
 

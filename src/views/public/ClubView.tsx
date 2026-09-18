@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal, Star, Crown, Search, ShieldCheck, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_MEMBERS, INITIAL_TROPHIES } from '../../lib/initialData';
-import { UserProfile, ClubTrophy } from '../../types/database';
+import { UserProfile, MemberPublicDirectoryItem, ClubTrophy } from '../../types/database';
 
 export const ClubView: React.FC = () => {
-  const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
+  const [members, setMembers] = useState<(UserProfile | MemberPublicDirectoryItem)[]>(INITIAL_MEMBERS);
   const [trophies, setTrophies] = useState<ClubTrophy[]>(INITIAL_TROPHIES);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [rankingSearch, setRankingSearch] = useState<string>('');
@@ -23,12 +23,12 @@ export const ClubView: React.FC = () => {
 
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('member_public_directory')
           .select('*')
           .order('elo_rating', { ascending: false });
 
         if (data && data.length > 0) {
-          setMembers(data as UserProfile[]);
+          setMembers(data as MemberPublicDirectoryItem[]);
         } else {
           setMembers(INITIAL_MEMBERS);
         }
@@ -55,7 +55,7 @@ export const ClubView: React.FC = () => {
 
   // Escalafón Oficial
   const activeMembers = useMemo(() => {
-    return members.filter((m) => m.role !== 'admin' || m.elo_rating);
+    return members.filter((m) => !('role' in m) || (m as any).role !== 'admin' || (m.elo_rating || 0) > 0);
   }, [members]);
 
   const memberCategoryCounts = useMemo(() => {

@@ -3,7 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { ShieldCheck, Search, Award, CheckCircle2, AlertCircle, ExternalLink, Trophy, Medal, ClipboardList, MessageCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_MEMBERS, INITIAL_EVENTS, INITIAL_MATCHES, INITIAL_APPLICATIONS } from '../../lib/initialData';
-import { UserProfile, ClubEvent, TournamentMatch, MembershipApplication } from '../../types/database';
+import { UserProfile, MemberPublicDirectoryItem, ClubEvent, TournamentMatch, MembershipApplication } from '../../types/database';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
 import { TournamentCertificateModal, TournamentCertificateData } from '../../components/common/TournamentCertificateModal';
 import { calculateTournamentStandings } from '../../lib/tournamentStandings';
@@ -17,12 +17,12 @@ export const VerifyCertificateView: React.FC = () => {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [members, setMembers] = useState<UserProfile[]>(INITIAL_MEMBERS);
+  const [members, setMembers] = useState<(UserProfile | MemberPublicDirectoryItem)[]>(INITIAL_MEMBERS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
   const [applications, setApplications] = useState<MembershipApplication[]>(INITIAL_APPLICATIONS);
   
-  const [matchedMember, setMatchedMember] = useState<UserProfile | null>(null);
+  const [matchedMember, setMatchedMember] = useState<UserProfile | MemberPublicDirectoryItem | null>(null);
   const [matchedDiploma, setMatchedDiploma] = useState<VerifiedDiploma | null>(null);
   const [matchedApplication, setMatchedApplication] = useState<MembershipApplication | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -30,20 +30,20 @@ export const VerifyCertificateView: React.FC = () => {
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [showDiplomaModal, setShowDiplomaModal] = useState(false);
 
-  // Cargar datos desde Supabase si está disponible
+  // Cargar datos desde Supabase si está disponible (usando vista pública segura sin exponer PII)
   useEffect(() => {
     const fetchData = async () => {
       if (isSupabaseConfigured()) {
         try {
-          const [profilesRes, eventsRes, matchesRes, appsRes] = await Promise.all([
-            supabase.from('profiles').select('*'),
+          const [directoryRes, eventsRes, matchesRes, appsRes] = await Promise.all([
+            supabase.from('member_public_directory').select('*'),
             supabase.from('events').select('*'),
             supabase.from('tournament_matches').select('*'),
             supabase.from('membership_applications').select('*'),
           ]);
 
-          if (!profilesRes.error && profilesRes.data && profilesRes.data.length > 0) {
-            setMembers(profilesRes.data as UserProfile[]);
+          if (!directoryRes.error && directoryRes.data && directoryRes.data.length > 0) {
+            setMembers(directoryRes.data as MemberPublicDirectoryItem[]);
           }
           if (!eventsRes.error && eventsRes.data && eventsRes.data.length > 0) {
             setEvents(eventsRes.data as ClubEvent[]);
@@ -115,8 +115,8 @@ export const VerifyCertificateView: React.FC = () => {
       const directId = (m.id || '').toLowerCase();
       const fideId = (m.fide_id || '').toLowerCase();
       const fullName = `${m.nombre} ${m.apellido}`.toLowerCase();
-      const email = (m.correo || '').toLowerCase();
-      const doc = (m.doc_number || '').toLowerCase();
+      const email = (('correo' in m && m.correo) ? m.correo : '').toLowerCase();
+      const doc = (('doc_number' in m && m.doc_number) ? m.doc_number : '').toLowerCase();
       const user = (m.usuario || '').toLowerCase();
 
       return (
@@ -124,7 +124,7 @@ export const VerifyCertificateView: React.FC = () => {
         directId === cleanQuery ||
         fideId === cleanQuery ||
         fullName.includes(cleanQuery) ||
-        email === cleanQuery ||
+        (email && email === cleanQuery) ||
         (doc && doc === cleanQuery) ||
         (user && user === cleanQuery)
       );

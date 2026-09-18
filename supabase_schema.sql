@@ -45,14 +45,18 @@ DECLARE
     user_apellido TEXT;
     user_role TEXT;
     user_username TEXT;
+    user_telefono TEXT;
+    user_categoria TEXT;
 BEGIN
     user_nombre := COALESCE(new.raw_user_meta_data->>'nombre', new.raw_user_meta_data->>'full_name', '');
     user_apellido := COALESCE(new.raw_user_meta_data->>'apellido', '');
     user_role := COALESCE(new.raw_user_meta_data->>'role', 'student');
+    user_telefono := COALESCE(new.raw_user_meta_data->>'telefono', '');
+    user_categoria := COALESCE(new.raw_user_meta_data->>'categoria', 'Iniciación');
     user_username := COALESCE(new.raw_user_meta_data->>'usuario', split_part(new.email, '@', 1));
 
     IF EXISTS (SELECT 1 FROM public.profiles WHERE usuario = user_username) THEN
-        user_username := user_username || '_' || substr(new.id::text, 1, 4);
+        user_username := user_username || '_' || substr(replace(new.id::text, '-', ''), 1, 6);
     END IF;
 
     INSERT INTO public.profiles (
@@ -61,7 +65,10 @@ BEGIN
         apellido,
         usuario,
         correo,
+        telefono,
+        categoria_ajedrez,
         role,
+        estado,
         avatar_url,
         created_at,
         updated_at
@@ -71,20 +78,49 @@ BEGIN
         user_apellido,
         user_username,
         new.email,
+        user_telefono,
+        user_categoria,
         user_role,
+        'active',
         COALESCE(new.raw_user_meta_data->>'avatar_url', ''),
         timezone('utc'::text, now()),
         timezone('utc'::text, now())
     );
 
     RETURN new;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'handle_new_user error para usuario %: %', new.id, SQLERRM;
+        RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ==============================================================================
+-- 2.1. VISTA PÚBLICA SEGURA: member_public_directory
+-- ==============================================================================
+CREATE OR REPLACE VIEW public.member_public_directory AS
+SELECT
+    p.id,
+    p.nombre,
+    p.apellido,
+    p.usuario,
+    p.ciudad,
+    p.categoria_ajedrez,
+    p.fide_id,
+    p.elo_rating,
+    p.estado
+FROM public.profiles p
+WHERE p.estado = 'active';
+
+COMMENT ON VIEW public.member_public_directory IS 
+'Directorio público seguro de afiliados activos para validación de certificados y escalafón sin exponer datos personales.';
+
+GRANT SELECT ON public.member_public_directory TO anon, authenticated;
 
 -- ==============================================================================
 -- 3. FUNCIÓN DE SEGURIDAD: is_admin()
