@@ -10,7 +10,7 @@ import {
   User, FileText, Trophy, Download, LogOut, CheckCircle2,
   Calendar, MapPin, Edit2, Save, CreditCard, Clock, Search, Plus,
   Swords, Eye, ChevronDown, ChevronUp, Award, ClipboardCheck, Users,
-  Megaphone, X, Globe
+  Megaphone, X, Globe, ExternalLink
 } from 'lucide-react';
 import { PgnViewerModal } from '../../components/common/PgnViewerModal';
 import { AffiliationCertificateModal } from '../../components/common/AffiliationCertificateModal';
@@ -24,7 +24,9 @@ export const MembersDashboardView: React.FC = () => {
   const { user, loading, logout, updateProfile, isConfigured } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'documentos' | 'torneos' | 'pagos' | 'horarios' | 'perfil'>('documentos');
+  const [activeTab, setActiveTab] = useState<'documentos' | 'torneos' | 'pagos' | 'horarios' | 'lichess' | 'perfil'>('documentos');
+  const [lichessViewMode, setLichessViewMode] = useState<'tv' | 'analysis' | 'puzzles'>('tv');
+  const [quickLichessInput, setQuickLichessInput] = useState<string>('');
   const [documents, setDocuments] = useState<ClubDocument[]>(INITIAL_DOCUMENTS);
   const [events, setEvents] = useState<ClubEvent[]>(INITIAL_EVENTS);
   const [matches, setMatches] = useState<TournamentMatch[]>(INITIAL_MATCHES);
@@ -55,6 +57,7 @@ export const MembersDashboardView: React.FC = () => {
     categoria_ajedrez: '',
     elo_rating: 0,
     fide_id: '',
+    lichess_username: '',
   });
 
   // Reportar pago
@@ -87,9 +90,49 @@ export const MembersDashboardView: React.FC = () => {
         categoria_ajedrez: user.categoria_ajedrez || 'Iniciación',
         elo_rating: user.elo_rating || 0,
         fide_id: user.fide_id || '',
+        lichess_username: user.lichess_username || '',
       });
+      if (user.lichess_username) {
+        setQuickLichessInput(user.lichess_username);
+      }
     }
   }, [user, navigate]);
+
+  const handleQuickLinkLichess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickLichessInput.trim()) return;
+    const res = await updateProfile({ lichess_username: quickLichessInput.trim() });
+    if (res.success) {
+      setNotice(`Usuario de Lichess "${quickLichessInput.trim()}" vinculado con éxito`);
+      setTimeout(() => setNotice(''), 3500);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: ClubDocument) => {
+    if (!doc.file_url || doc.file_url === '#') {
+      setNotice(`El recurso "${doc.title}" estará próximamente disponible.`);
+      setTimeout(() => setNotice(''), 3500);
+      return;
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('documents')
+          .update({ downloads_count: (doc.downloads_count || 0) + 1 })
+          .eq('id', doc.id);
+      } catch (err) {
+        console.error('Error al actualizar contador de descargas:', err);
+      }
+    }
+
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === doc.id ? { ...d, downloads_count: (d.downloads_count || 0) + 1 } : d))
+    );
+
+    window.open(doc.file_url, '_blank', 'noopener,noreferrer');
+  };
+
 
   useEffect(() => {
     async function loadMemberData() {
@@ -415,6 +458,16 @@ export const MembersDashboardView: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setActiveTab('lichess')}
+            className={`btn btn--sm ${activeTab === 'lichess' ? 'btn--primary' : 'btn--ghost'}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Swords size={16} />
+            <span>Tablero Lichess & Estudio</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('perfil')}
             className={`btn btn--sm ${activeTab === 'perfil' ? 'btn--primary' : 'btn--ghost'}`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
@@ -439,7 +492,7 @@ export const MembersDashboardView: React.FC = () => {
 
               {/* Categorías */}
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {['all', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares'].map((cat) => (
+                {['all', 'Material de Estudio', 'Reglamento', 'Partidas PGN', 'Circulares', 'Guía', 'Formulario de inscripción', 'Resolución', 'Acta'].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSelectedDocCategory(cat)}
@@ -491,9 +544,16 @@ export const MembersDashboardView: React.FC = () => {
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase' }}>
                         {doc.category}
                       </span>
-                      <span style={{ fontSize: '0.75rem', background: '#222', padding: '0.2rem 0.5rem', borderRadius: '4px', color: '#aaa', textTransform: 'uppercase' }}>
-                        {doc.file_type} · {doc.file_size}
-                      </span>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {(!doc.file_url || doc.file_url === '#') && (
+                          <span style={{ fontSize: '0.68rem', background: '#2c1e08', color: '#fbbf24', border: '1px solid #785215', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
+                            Próximamente
+                          </span>
+                        )}
+                        <span style={{ fontSize: '0.75rem', background: '#222', padding: '0.2rem 0.5rem', borderRadius: '4px', color: '#aaa', textTransform: 'uppercase' }}>
+                          {doc.file_type} · {doc.file_size}
+                        </span>
+                      </div>
                     </div>
 
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '0.6rem', color: '#fff' }}>
@@ -535,14 +595,37 @@ export const MembersDashboardView: React.FC = () => {
                           <span>Ver Partida</span>
                         </button>
                       )}
-                      <button
-                        onClick={() => alert(`Iniciando descarga: ${doc.title} (${doc.file_type.toUpperCase()})`)}
-                        className="btn btn--primary btn--sm"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                      >
-                        <Download size={14} />
-                        <span>Descargar</span>
-                      </button>
+                      {!doc.file_url || doc.file_url === '#' ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="btn btn--sm"
+                          style={{
+                            background: '#181818',
+                            color: '#777',
+                            border: '1px solid #2e2e2e',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            cursor: 'not-allowed',
+                            fontSize: '0.78rem',
+                          }}
+                          title="Este recurso estará disponible para descarga en breve"
+                        >
+                          <Clock size={13} />
+                          <span>Próximamente</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadDocument(doc)}
+                          className="btn btn--primary btn--sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                        >
+                          <Download size={14} />
+                          <span>Descargar</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1184,6 +1267,16 @@ export const MembersDashboardView: React.FC = () => {
                         }}>
                           {p.status === 'approved' ? 'Al Día ✓' : p.status === 'rejected' ? 'Rechazado' : 'En Verificación'}
                         </span>
+                        {p.status === 'approved' && p.reviewed_at && (
+                          <div style={{ fontSize: '0.68rem', color: '#81c784', marginTop: '0.25rem' }}>
+                            Validado: {new Date(p.reviewed_at).toLocaleDateString('es-CO')}
+                          </div>
+                        )}
+                        {p.status === 'rejected' && p.rejection_reason && (
+                          <div style={{ fontSize: '0.72rem', color: '#fca5a5', marginTop: '0.35rem', maxWidth: '220px', marginLeft: 'auto', lineHeight: 1.3, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', padding: '0.3rem 0.5rem', borderRadius: '4px', textAlign: 'left' }}>
+                            <strong>Motivo:</strong> {p.rejection_reason}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1332,6 +1425,193 @@ export const MembersDashboardView: React.FC = () => {
           </div>
         )}
 
+        {/* PESTAÑA: TABLERO LICHESS & ESTUDIO */}
+        {activeTab === 'lichess' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.8rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Swords size={22} color="var(--gold)" />
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--gold)' }}>
+                    Tablero de Ajedrez & Estudio Lichess.org
+                  </h2>
+                </div>
+                <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '0.3rem' }}>
+                  Entrena táctica diaria, analiza variantes de tus partidas y conéctate a la comunidad oficial de Lichess
+                </p>
+              </div>
+
+              {user?.lichess_username && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <a
+                    href={`https://lichess.org/@/${encodeURIComponent(user.lichess_username)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn--ghost btn--sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--gold)', borderColor: 'var(--gold)' }}
+                  >
+                    <span>Lichess: @{user.lichess_username}</span>
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso para vincular usuario de Lichess si aún no lo tiene */}
+            {!user?.lichess_username && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #1b160c 0%, #121212 100%)',
+                  border: '1px solid #785215',
+                  borderRadius: '12px',
+                  padding: '1.25rem 1.6rem',
+                  marginBottom: '1.8rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: '0 0 0.3rem 0', color: 'var(--gold)', fontSize: '1rem' }}>
+                    Vincula tu usuario de Lichess.org
+                  </h4>
+                  <p style={{ margin: 0, color: '#aaa', fontSize: '0.86rem' }}>
+                    Al asociar tu usuario podrás ver tu partida en directo (Lichess TV) y tus partidas recientes aquí mismo.
+                  </p>
+                </div>
+
+                <form onSubmit={handleQuickLinkLichess} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Usuario en Lichess..."
+                    value={quickLichessInput}
+                    onChange={(e) => setQuickLichessInput(e.target.value)}
+                    style={{
+                      padding: '0.5rem 0.8rem',
+                      borderRadius: '6px',
+                      background: '#1c1c1c',
+                      border: '1px solid #444',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      minWidth: '180px',
+                    }}
+                  />
+                  <button type="submit" className="btn btn--primary btn--sm" style={{ whiteSpace: 'nowrap' }}>
+                    Vincular Cuenta
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Selector de Modos Lichess */}
+            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setLichessViewMode('tv')}
+                className={`btn btn--sm ${lichessViewMode === 'tv' ? 'btn--primary' : 'btn--ghost'}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Eye size={15} />
+                <span>{user?.lichess_username ? `Mi Partida / TV (${user.lichess_username})` : 'Lichess TV Oficial'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLichessViewMode('analysis')}
+                className={`btn btn--sm ${lichessViewMode === 'analysis' ? 'btn--primary' : 'btn--ghost'}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Swords size={15} />
+                <span>Tablero de Análisis Libre</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLichessViewMode('puzzles')}
+                className={`btn btn--sm ${lichessViewMode === 'puzzles' ? 'btn--primary' : 'btn--ghost'}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Award size={15} />
+                <span>Entrenamiento Táctico del Día</span>
+              </button>
+            </div>
+
+            {/* Contenedor Iframe Responsivo */}
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '920px',
+                background: '#121212',
+                border: '1px solid #2e2e2e',
+                borderRadius: '14px',
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              }}
+            >
+              <div
+                style={{
+                  background: '#1a1a1a',
+                  borderBottom: '1px solid #2a2a2a',
+                  padding: '0.75rem 1.2rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.82rem',
+                  color: '#aaa',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                  <span>
+                    {lichessViewMode === 'tv'
+                      ? (user?.lichess_username ? `Lichess TV: Partida de @${user.lichess_username}` : 'Lichess TV: Partida Magistral en Vivo')
+                      : lichessViewMode === 'analysis'
+                      ? 'Lichess Embed: Análisis Libre de Posición & Motor Stockfish'
+                      : 'Lichess Embed: Problema de Táctica'}
+                  </span>
+                </div>
+                <a
+                  href="https://lichess.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--gold)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <span>lichess.org</span>
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+
+              <div style={{ position: 'relative', width: '100%', height: '560px' }}>
+                <iframe
+                  src={
+                    lichessViewMode === 'tv'
+                      ? user?.lichess_username
+                        ? `https://lichess.org/tv/frame?username=${encodeURIComponent(user.lichess_username)}&theme=brown&bg=dark`
+                        : `https://lichess.org/tv/frame?theme=brown&bg=dark`
+                      : lichessViewMode === 'analysis'
+                      ? `https://lichess.org/analysis/embed?theme=brown&bg=dark`
+                      : `https://lichess.org/training/frame?theme=brown&bg=dark`
+                  }
+                  title="Tablero Lichess Capablanca"
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  sandbox="allow-scripts allow-same-origin allow-popups"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              </div>
+            </div>
+
+            {/* Pauta Pedagógica Capablanca */}
+            <div style={{ marginTop: '1.5rem', padding: '1rem 1.4rem', background: '#141414', border: '1px solid #262626', borderRadius: '10px', maxWidth: '920px' }}>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#999', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--gold)' }}>Consejo del Club:</strong> Usa el tablero de análisis para reproducir y estudiar tus partidas de torneo antes de tu próxima clase con los profesores del Club en el CC Aves María.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* PESTAÑA 5: PERFIL Y FICHA */}
         {activeTab === 'perfil' && (
           <div style={{ maxWidth: '700px' }}>
@@ -1437,6 +1717,31 @@ export const MembersDashboardView: React.FC = () => {
                     </div>
                   </div>
 
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#bbb', marginBottom: '0.4rem' }}>FIDE ID (Opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="ej. 392014"
+                        value={profileForm.fide_id}
+                        onChange={(e) => setProfileForm({ ...profileForm, fide_id: e.target.value })}
+                        style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: '#bbb', marginBottom: '0.4rem' }}>
+                        Usuario Lichess.org (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ej. capablanca_sabaneta"
+                        value={profileForm.lichess_username}
+                        onChange={(e) => setProfileForm({ ...profileForm, lichess_username: e.target.value })}
+                        style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#1c1c1c', border: '1px solid #333', color: '#fff' }}
+                      />
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                     <button type="submit" className="btn btn--primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Save size={16} />
@@ -1461,9 +1766,28 @@ export const MembersDashboardView: React.FC = () => {
                     </p>
 
                     <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase' }}>Teléfono</span>
-                    <p style={{ fontSize: '1rem', color: '#ccc', margin: '0.2rem 0' }}>
+                    <p style={{ fontSize: '1rem', color: '#ccc', margin: '0.2rem 0 1rem' }}>
                       {user.telefono || 'Sin registrar'}
                     </p>
+
+                    <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase' }}>Perfil Lichess.org</span>
+                    {user.lichess_username ? (
+                      <p style={{ margin: '0.2rem 0 1rem' }}>
+                        <a
+                          href={`https://lichess.org/@/${encodeURIComponent(user.lichess_username)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--gold)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '1rem', fontWeight: 600 }}
+                        >
+                          <span>@{user.lichess_username}</span>
+                          <ExternalLink size={13} />
+                        </a>
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: '0.9rem', color: '#777', margin: '0.2rem 0 1rem', fontStyle: 'italic' }}>
+                        Sin vincular
+                      </p>
+                    )}
                   </div>
 
                   <div>

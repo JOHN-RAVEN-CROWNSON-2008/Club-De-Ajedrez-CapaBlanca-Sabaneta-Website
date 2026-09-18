@@ -1,6 +1,8 @@
-import React from 'react';
-import { X, Printer, ShieldCheck, QrCode, ExternalLink, Award, Copy, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Printer, ShieldCheck, ExternalLink, Award, Copy, Check, Download } from 'lucide-react';
 import { UserProfile } from '../../types/database';
+import { generateQrSvg } from '../../lib/qrCode';
+import { exportAthleteCardAsPng } from '../../lib/cardExport';
 
 interface DigitalAthleteIdCardModalProps {
   isOpen: boolean;
@@ -23,7 +25,8 @@ export const DigitalAthleteIdCardModal: React.FC<DigitalAthleteIdCardModalProps>
   onClose,
   member,
 }) => {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -38,6 +41,15 @@ export const DigitalAthleteIdCardModal: React.FC<DigitalAthleteIdCardModalProps>
     navigator.clipboard.writeText(verificationUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
+  };
+
+  const handleDownloadPng = async () => {
+    setIsExporting(true);
+    try {
+      await exportAthleteCardAsPng(member, certCode, verificationUrl);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -245,32 +257,57 @@ export const DigitalAthleteIdCardModal: React.FC<DigitalAthleteIdCardModalProps>
             </div>
 
             {/* Pie del Carnet: Código de Verificación y Micro-QR */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.45rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.45rem' }}>
               <div>
                 <span style={{ fontSize: '0.55rem', color: '#777', display: 'block' }}>CÓDIGO OFICIAL</span>
                 <span style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: '#d4af37', fontWeight: 700 }}>
                   {certCode}
                 </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.58rem', color: '#aaa', marginTop: '0.15rem' }}>
+                  <ShieldCheck size={12} color="#d4af37" />
+                  <span>Res. 042 Inder Sabaneta</span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.6rem', color: '#aaa' }}>
-                <ShieldCheck size={14} color="#d4af37" />
-                <span>Res. 042 Inder Sabaneta</span>
-              </div>
+              {/* Micro QR Dinámico de Validación */}
+              <div
+                title="Escanear para verificar afiliación"
+                style={{
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(212,175,55,0.5)',
+                  borderRadius: '6px',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                dangerouslySetInnerHTML={{ __html: generateQrSvg(verificationUrl, 44, '#d4af37') }}
+              />
             </div>
           </div>
 
           {/* Acciones del Modal */}
           <div className="no-print" style={{ width: '100%', maxWidth: '430px', marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            <div style={{ display: 'flex', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                disabled={isExporting}
+                onClick={handleDownloadPng}
+                className="btn btn--primary"
+                style={{ flex: 1, minWidth: '170px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700 }}
+              >
+                <Download size={16} />
+                <span>{isExporting ? 'Generando...' : 'Descargar Carnet (PNG HD)'}</span>
+              </button>
               <button
                 type="button"
                 onClick={handlePrint}
-                className="btn btn--primary"
-                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 700 }}
+                className="btn btn--ghost"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                title="Imprimir credencial en formato físico"
               >
-                <Printer size={16} />
-                <span>Imprimir Carnet</span>
+                <Printer size={15} />
+                <span>Imprimir</span>
               </button>
               <button
                 type="button"

@@ -3,7 +3,7 @@
 export type UserRole = 'admin' | 'member' | 'student';
 export type UserStatus = 'active' | 'inactive' | 'pending';
 export type EventStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
-export type DocumentCategory = 'General' | 'Reglamento' | 'Material de Estudio' | 'Partidas PGN' | 'Circulares';
+export type DocumentCategory = 'General' | 'Reglamento' | 'Material de Estudio' | 'Partidas PGN' | 'Circulares' | 'Guía' | 'Formulario de inscripción' | 'Resolución' | 'Acta';
 export type RegistrationStatus = 'confirmed' | 'pending' | 'waitlist' | 'attended' | 'cancelled';
 export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 export type PaymentMethod = 'Nequi' | 'Daviplata' | 'Bancolombia' | 'Efectivo' | 'Otro';
@@ -26,6 +26,7 @@ export interface UserProfile {
   fide_id?: string;
   elo_rating?: number;
   avatar_url?: string;
+  lichess_username?: string;
   estado: UserStatus;
   created_at: string;
   updated_at?: string;
@@ -86,7 +87,7 @@ export interface ClubDocument {
   id: string;
   title: string;
   description: string;
-  file_url: string;
+  file_url?: string;
   file_type: string;
   file_size: string;
   category: DocumentCategory;
@@ -140,6 +141,9 @@ export interface MembershipPayment {
   status: PaymentStatus;
   receipt_url?: string;
   notes?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
   created_at: string;
 }
 

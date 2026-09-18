@@ -16,7 +16,8 @@ import {
   MembershipPayment, ClassSchedule, ClubAnnouncement, TournamentMatch,
   GalleryItem, TournamentRegistration, ClassAttendance, AttendanceStatus,
   ClubTrophy, TrophyType, MembershipApplication, ApplicationStatus,
-  AIProviderSetting, AIProvider, ContentBlock, ContentBlockPage, ContentBlockValueType
+  AIProviderSetting, AIProvider, ContentBlock, ContentBlockPage, ContentBlockValueType,
+  DocumentCategory
 } from '../../types/database';
 import {
   ShieldCheck, LayoutDashboard, Globe, Trophy, BookOpen, FileText,
@@ -36,6 +37,7 @@ import { ApplicationDetailModal } from '../../components/common/ApplicationDetai
 import { PairingAthlete } from '../../lib/tournamentPairings';
 import { whatsappService } from '../../services/whatsappService';
 import { aiService } from '../../services/aiService';
+import { resendService } from '../../services/resendService';
 import { AdminLoginView } from '../auth/AdminLoginView';
 import { calculateTournamentStandings, exportStandingsToCsv } from '../../lib/tournamentStandings';
 
@@ -231,6 +233,9 @@ export const AdminDashboardView: React.FC = () => {
   const [tournamentCertModalData, setTournamentCertModalData] = useState<TournamentCertificateData | null>(null);
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [selectedApplicationForDetail, setSelectedApplicationForDetail] = useState<MembershipApplication | null>(null);
+  const [paymentToReject, setPaymentToReject] = useState<MembershipPayment | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+  const [isSubmittingPaymentReview, setIsSubmittingPaymentReview] = useState<boolean>(false);
 
   // Validar permisos
   useEffect(() => {
@@ -666,18 +671,19 @@ export const AdminDashboardView: React.FC = () => {
   // Documento
   const handleCreateDoc = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDoc.file_url || newDoc.file_url === '#') {
-      triggerNotice('Sube un archivo o pega un enlace antes de publicar el recurso');
+    if (!newDoc.title.trim()) {
+      triggerNotice('Por favor escribe un título para el documento');
       return;
     }
+    const hasFile = !!newDoc.file_url && newDoc.file_url !== '#';
     const docItem: ClubDocument = {
       id: crypto.randomUUID(),
-      title: newDoc.title,
-      description: newDoc.description,
-      category: newDoc.category,
-      file_type: newDoc.file_type,
-      file_size: newDoc.file_size,
-      file_url: newDoc.file_url,
+      title: newDoc.title.trim(),
+      description: newDoc.description.trim(),
+      category: newDoc.category as DocumentCategory,
+      file_type: newDoc.file_type || (hasFile ? 'pdf' : 'doc'),
+      file_size: hasFile ? (newDoc.file_size || '1.0 MB') : 'Próximamente',
+      file_url: hasFile ? newDoc.file_url : undefined,
       min_role: 'student',
       downloads_count: 0,
       created_at: new Date().toISOString(),
@@ -688,7 +694,7 @@ export const AdminDashboardView: React.FC = () => {
     setDocuments([docItem, ...documents]);
     setShowDocModal(false);
     setNewDoc({ title: '', description: '', category: 'Material de Estudio' as const, file_type: 'pdf', file_size: '2.1 MB', file_url: '#' });
-    triggerNotice('Documento añadido');
+    triggerNotice(hasFile ? 'Documento publicado con éxito' : 'Documento registrado (próximamente disponible)');
   };
 
   const handleDeleteDoc = async (id: string) => {
@@ -1101,13 +1107,122 @@ export const AdminDashboardView: React.FC = () => {
     }
   };
 
-  // Aprobar / Rechazar Pago
-  const handleUpdatePaymentStatus = async (paymentId: string, newStatus: 'approved' | 'rejected') => {
+  // Aprobar Pago con auditoría y notificación por email
+  const handleApprovePayment = async (payment: MembershipPayment) => {
+    setIsSubmittingPaymentReview(true);
+    const updatedData = {
+      status: 'approved' as const,
+      reviewed_by: user?.id || 'admin',
+      reviewed_at: new Date().toISOString(),
+    };
+
     if (isSupabaseConfigured()) {
-      await supabase.from('membership_payments').update({ status: newStatus }).eq('id', paymentId);
+      try {
+        await supabase.from('membership_payments').update(updatedData).eq('id', payment.id);
+      } catch (err) {
+        console.error('Error al actualizar pago en Supabase:', err);
+      }
     }
-    setPayments(payments.map((p) => (p.id === paymentId ? { ...p, status: newStatus } : p)));
-    triggerNotice(`Pago ${newStatus === 'approved' ? 'Aprobado ✓' : 'Rechazado'}`);
+
+    setPayments(payments.map((p) => (p.id === payment.id ? { ...p, ...updatedData } : p)));
+
+    // Enviar correo de confirmación al afiliado
+    const recipientEmail = payment.user_email || members.find((m) => m.id === payment.user_id)?.correo;
+    if (recipientEmail) {
+      try {
+        await resendService.sendPaymentApprovedEmail(
+          recipientEmail,
+          payment.user_name || 'Afiliado',
+          payment.period,
+          payment.amount
+        );
+      } catch (emailErr) {
+        console.warn('Error al enviar email de pago aprobado:', emailErr);
+      }
+    }
+
+    setIsSubmittingPaymentReview(false);
+    triggerNotice(`Pago de ${payment.user_name || 'afiliado'} aprobado exitosamente ✓`);
+  };
+
+  // Abrir modal de rechazo de pago
+  const handleOpenRejectPayment = (payment: MembershipPayment) => {
+    setPaymentToReject(payment);
+    setRejectionReason('El comprobante adjunto no es legible o la referencia no coincide.');
+  };
+
+  // Confirmar Rechazo de Pago con motivo y notificación
+  const handleConfirmRejectPayment = async () => {
+    if (!paymentToReject) return;
+    setIsSubmittingPaymentReview(true);
+    const reason = rejectionReason.trim() || 'Comprobante no válido';
+    const updatedData = {
+      status: 'rejected' as const,
+      reviewed_by: user?.id || 'admin',
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: reason,
+    };
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('membership_payments').update(updatedData).eq('id', paymentToReject.id);
+      } catch (err) {
+        console.error('Error al rechazar pago en Supabase:', err);
+      }
+    }
+
+    setPayments(payments.map((p) => (p.id === paymentToReject.id ? { ...p, ...updatedData } : p)));
+
+    // Enviar correo con el motivo de rechazo al afiliado
+    const recipientEmail = paymentToReject.user_email || members.find((m) => m.id === paymentToReject.user_id)?.correo;
+    if (recipientEmail) {
+      try {
+        await resendService.sendPaymentRejectedEmail(
+          recipientEmail,
+          paymentToReject.user_name || 'Afiliado',
+          paymentToReject.period,
+          paymentToReject.amount,
+          reason
+        );
+      } catch (emailErr) {
+        console.warn('Error al enviar email de pago rechazado:', emailErr);
+      }
+    }
+
+    setIsSubmittingPaymentReview(false);
+    setPaymentToReject(null);
+    triggerNotice('Comprobante rechazado y notificación enviada al afiliado.');
+  };
+
+  // Exportar Pagos y Tesorería a CSV
+  const handleExportPaymentsCSV = () => {
+    const headers = [
+      'ID', 'Periodo', 'Afiliado', 'Email', 'Monto', 'Método',
+      'Referencia', 'Fecha Pago', 'Estado', 'Revisado Por', 'Fecha Revisión', 'Motivo Rechazo'
+    ];
+    const rows = payments.map((p) => [
+      p.id,
+      p.period,
+      p.user_name || p.user_id,
+      p.user_email || '',
+      p.amount,
+      p.payment_method,
+      p.reference_number,
+      p.payment_date,
+      p.status,
+      p.reviewed_by || '',
+      p.reviewed_at ? new Date(p.reviewed_at).toLocaleDateString('es-CO') : '',
+      (p.rejection_reason || '').replace(/"/g, '""'),
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.map((f) => `"${f}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Reporte_Tesoreria_Capablanca_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerNotice('Reporte de tesorería exportado a CSV exitosamente');
   };
 
   // Cambiar rol de afiliado
@@ -3530,6 +3645,8 @@ export const AdminDashboardView: React.FC = () => {
                         <option value="Reglamento">Reglamento</option>
                         <option value="Partidas PGN">Partidas PGN</option>
                         <option value="Circulares">Circulares</option>
+                        <option value="Guía">Guía</option>
+                        <option value="Formulario de inscripción">Formulario de inscripción</option>
                         <option value="Resolución">Resolución</option>
                         <option value="Acta">Acta (Asamblea/Junta Directiva)</option>
                         <option value="General">General</option>
@@ -4216,11 +4333,20 @@ export const AdminDashboardView: React.FC = () => {
           {/* 7. SECCIÓN: CUOTAS & PAGOS DE AFILIADOS */}
           {activeSection === 'payments' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                  <h1 className="display display--gold" style={{ fontSize: '1.8rem' }}>Gestor de Cuotas y Pagos</h1>
-                  <p style={{ color: '#888' }}>Control de mensualidades y comprobantes reportados por afiliados</p>
+                  <h1 className="display display--gold" style={{ fontSize: '1.8rem', margin: 0 }}>Gestor de Cuotas y Pagos</h1>
+                  <p style={{ color: '#888', margin: '0.3rem 0 0' }}>Control de mensualidades, comprobantes de pago y auditoría de tesorería</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleExportPaymentsCSV}
+                  className="btn btn--outline btn--sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--gold)', color: 'var(--gold)' }}
+                  title="Exportar archivo CSV con todo el historial de pagos y auditoría"
+                >
+                  <Download size={15} /> Exportar Tesorería (CSV)
+                </button>
               </div>
 
               <div style={{ background: '#141414', border: '1px solid #222', borderRadius: '12px', overflow: 'hidden' }}>
@@ -4232,7 +4358,7 @@ export const AdminDashboardView: React.FC = () => {
                       <th style={{ padding: '1rem' }}>Monto</th>
                       <th style={{ padding: '1rem' }}>Método & Ref</th>
                       <th style={{ padding: '1rem' }}>Fecha</th>
-                      <th style={{ padding: '1rem' }}>Estado</th>
+                      <th style={{ padding: '1rem' }}>Estado & Auditoría</th>
                       <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
                     </tr>
                   </thead>
@@ -4252,9 +4378,20 @@ export const AdminDashboardView: React.FC = () => {
                             fontWeight: 700,
                             background: p.status === 'approved' ? '#1b5e20' : p.status === 'rejected' ? '#b71c1c' : '#f57f17',
                             color: '#fff',
+                            display: 'inline-block',
                           }}>
-                            {p.status === 'approved' ? 'Aprobado' : p.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                            {p.status === 'approved' ? 'Aprobado ✓' : p.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
                           </span>
+                          {p.reviewed_at && (
+                            <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '0.25rem' }}>
+                              {new Date(p.reviewed_at).toLocaleDateString('es-CO')}
+                            </div>
+                          )}
+                          {p.status === 'rejected' && p.rejection_reason && (
+                            <div style={{ fontSize: '0.72rem', color: '#ff8a80', marginTop: '0.2rem', maxWidth: '200px', lineHeight: 1.2 }}>
+                              Motivo: {p.rejection_reason}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -4284,16 +4421,30 @@ export const AdminDashboardView: React.FC = () => {
                             )}
                             {p.status === 'pending' && (
                               <>
-                                <button onClick={() => handleUpdatePaymentStatus(p.id, 'approved')} className="btn btn--primary btn--sm" style={{ padding: '0.3rem 0.6rem' }} title="Aprobar cuota">
+                                <button
+                                  type="button"
+                                  disabled={isSubmittingPaymentReview}
+                                  onClick={() => handleApprovePayment(p)}
+                                  className="btn btn--primary btn--sm"
+                                  style={{ padding: '0.3rem 0.6rem' }}
+                                  title="Aprobar cuota y enviar confirmación por email"
+                                >
                                   <Check size={14} />
                                 </button>
-                                <button onClick={() => handleUpdatePaymentStatus(p.id, 'rejected')} className="btn btn--ghost btn--sm" style={{ padding: '0.3rem 0.6rem', borderColor: '#b71c1c', color: '#ff8a80' }} title="Rechazar cuota">
+                                <button
+                                  type="button"
+                                  disabled={isSubmittingPaymentReview}
+                                  onClick={() => handleOpenRejectPayment(p)}
+                                  className="btn btn--ghost btn--sm"
+                                  style={{ padding: '0.3rem 0.6rem', borderColor: '#b71c1c', color: '#ff8a80' }}
+                                  title="Rechazar cuota con motivo de auditoría y notificar"
+                                >
                                   <X size={14} />
                                 </button>
                               </>
                             )}
                             {p.status !== 'pending' && (
-                              <span style={{ fontSize: '0.8rem', color: '#666' }}>Procesado</span>
+                              <span style={{ fontSize: '0.75rem', color: '#777' }}>Auditado</span>
                             )}
                           </div>
                         </td>
@@ -5535,6 +5686,101 @@ export const AdminDashboardView: React.FC = () => {
         onExportBackup={handleExportFullJsonBackup}
         onNotice={triggerNotice}
       />
+
+      {/* Modal Motivo de Rechazo de Comprobante de Pago */}
+      {paymentToReject && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => !isSubmittingPaymentReview && setPaymentToReject(null)}
+        >
+          <div
+            style={{
+              background: '#181818',
+              border: '1px solid #333',
+              borderRadius: '16px',
+              padding: '2rem',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '0.6rem', borderRadius: '10px' }}>
+                  <AlertCircle size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#fff' }}>Rechazar Comprobante</h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#888' }}>
+                    {paymentToReject.user_name || 'Afiliado'} · {paymentToReject.period} (${paymentToReject.amount.toLocaleString('es-CO')})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPaymentToReject(null)}
+                style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Indica la razón del rechazo. Este motivo quedará registrado en la auditoría y se enviará automáticamente por correo al afiliado ({paymentToReject.user_email || 'correo del afiliado'}):
+            </p>
+
+            <textarea
+              rows={4}
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Ej: El comprobante no es legible, el valor no coincide con la cuota pactada, o la referencia bancaria no concuerda con los extractos."
+              style={{
+                width: '100%',
+                background: '#111',
+                border: '1px solid #444',
+                borderRadius: '8px',
+                padding: '0.85rem',
+                color: '#fff',
+                fontSize: '0.9rem',
+                marginBottom: '1.5rem',
+                resize: 'vertical',
+                outline: 'none',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                disabled={isSubmittingPaymentReview}
+                onClick={() => setPaymentToReject(null)}
+                className="btn btn--ghost btn--sm"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingPaymentReview || !rejectionReason.trim()}
+                onClick={handleConfirmRejectPayment}
+                className="btn btn--sm"
+                style={{ background: '#b71c1c', color: '#fff', border: 'none', fontWeight: 600, padding: '0.6rem 1.2rem' }}
+              >
+                {isSubmittingPaymentReview ? 'Procesando...' : 'Confirmar Rechazo y Notificar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Esquema SQL Supabase */}
       {showSqlModal && (

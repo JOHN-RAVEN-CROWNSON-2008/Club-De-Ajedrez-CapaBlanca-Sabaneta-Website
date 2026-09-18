@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     fide_id TEXT,
     elo_rating INTEGER DEFAULT 0,
     avatar_url TEXT,
+    lichess_username TEXT,
     estado TEXT NOT NULL DEFAULT 'active' CHECK (estado IN ('active', 'inactive', 'pending')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -203,10 +204,10 @@ CREATE TABLE IF NOT EXISTS public.documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title TEXT NOT NULL,
     description TEXT,
-    file_url TEXT NOT NULL,
+    file_url TEXT,
     file_type TEXT NOT NULL DEFAULT 'pdf',
     file_size TEXT DEFAULT '1.2 MB',
-    category TEXT NOT NULL DEFAULT 'General' CHECK (category IN ('General', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares')),
+    category TEXT NOT NULL DEFAULT 'General' CHECK (category IN ('General', 'Reglamento', 'Material de Estudio', 'Partidas PGN', 'Circulares', 'Guía', 'Formulario de inscripción', 'Resolución', 'Acta')),
     min_role TEXT NOT NULL DEFAULT 'student' CHECK (min_role IN ('admin', 'member', 'student')),
     downloads_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -267,6 +268,9 @@ CREATE TABLE IF NOT EXISTS public.membership_payments (
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
     receipt_url TEXT,
     notes TEXT,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    rejection_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
