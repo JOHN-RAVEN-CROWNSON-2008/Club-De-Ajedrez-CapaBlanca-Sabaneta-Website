@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_POSTS } from '../../lib/initialData';
 import { Post } from '../../types/database';
+import { normalizeImageUrl, handleImageError } from '../../lib/imageUtils';
 import { ArrowLeft, Calendar, User, Share2, Copy, Check, MessageCircle, ArrowRight, GraduationCap } from 'lucide-react';
 
 export const BlogPostView: React.FC = () => {
@@ -88,7 +89,7 @@ export const BlogPostView: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ paddingTop: 'calc(var(--header-h) + 4rem)', textAlign: 'center', minHeight: '60vh', color: '#fff' }}>
+      <div style={{ paddingTop: 'calc(var(--content-offset) + 2rem)', textAlign: 'center', minHeight: '60vh', color: '#fff' }}>
         Cargando artículo...
       </div>
     );
@@ -96,7 +97,7 @@ export const BlogPostView: React.FC = () => {
 
   if (!post) {
     return (
-      <div style={{ paddingTop: 'calc(var(--header-h) + 4rem)', textAlign: 'center', minHeight: '60vh', color: '#fff' }}>
+      <div style={{ paddingTop: 'calc(var(--content-offset) + 2rem)', textAlign: 'center', minHeight: '60vh', color: '#fff' }}>
         <h2>Artículo no encontrado</h2>
         <p style={{ color: '#aaa', margin: '1rem 0 2rem' }}>La publicación solicitada no existe o fue retirada.</p>
         <Link to="/blog" className="btn btn--primary">
@@ -107,7 +108,7 @@ export const BlogPostView: React.FC = () => {
   }
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)', background: '#0d0d0d', color: '#fff', minHeight: '100vh' }}>
+    <div style={{ paddingTop: 'var(--content-offset)', background: '#0d0d0d', color: '#fff', minHeight: '100vh' }}>
       <div className="wrap-narrow" style={{ paddingBlock: '3rem' }}>
         <Link
           to="/blog"
@@ -138,7 +139,12 @@ export const BlogPostView: React.FC = () => {
 
         {post.cover_image && (
           <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '2.5rem', border: '1px solid #222' }}>
-            <img src={post.cover_image} alt={post.title} style={{ width: '100%', height: 'auto', display: 'block' }} />
+            <img
+              src={normalizeImageUrl(post.cover_image)}
+              alt={post.title}
+              onError={handleImageError}
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
           </div>
         )}
 
@@ -264,7 +270,12 @@ export const BlogPostView: React.FC = () => {
                 >
                   {rel.cover_image && (
                     <div style={{ height: '140px', overflow: 'hidden' }}>
-                      <img src={rel.cover_image} alt={rel.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img
+                        src={normalizeImageUrl(rel.cover_image)}
+                        alt={rel.title}
+                        onError={handleImageError}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
                     </div>
                   )}
                   <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', flex: 1 }}>

@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+// REGLA CRÍTICA DE ARQUITECTURA DOM / CSS (Bloque 0):
+// Prohibido aplicar transform, filter, perspective o will-change: transform
+// en #root, body o cualquier componente contenedor que envuelva a <Header />.
+// Un transform en cualquier ancestro crea un nuevo containing block y desacopla
+// position: fixed del viewport, causando saltos y huecos en la barra de navegación.
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { User, Menu, X, ArrowRight } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
+import { ClubAnnouncement } from '../../types/database';
+import { handleImageError } from '../../lib/imageUtils';
+import { User, X, ArrowRight, Megaphone } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const [isStuck, setIsStuck] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(null);
+  const bannerRef = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
   const location = useLocation();
 
+  // Detección de scroll para estado compacto/adherido
   useEffect(() => {
     const handleScroll = () => {
       setIsStuck(window.scrollY > 40);
@@ -21,6 +34,58 @@ export const Header: React.FC = () => {
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
+
+  // Carga de avisos prioritarios dinámicos
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAnnouncement() {
+      if (!isSupabaseConfigured()) {
+        const fallback = INITIAL_ANNOUNCEMENTS.find((a) => a.active && (a.target === 'all' || a.target === 'public'));
+        if (isMounted && fallback) setActiveBanner(fallback);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('club_announcements')
+          .select('*')
+          .eq('active', true)
+          .in('target', ['all', 'public'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!error && data && data.length > 0 && isMounted) {
+          setActiveBanner(data[0] as ClubAnnouncement);
+        }
+      } catch (err) {
+        console.warn('Carga de avisos en Header:', err);
+      }
+    }
+
+    loadAnnouncement();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sincronización dinámica de la altura del anuncio con las variables CSS globales
+  useEffect(() => {
+    if (bannerRef.current && activeBanner) {
+      const height = bannerRef.current.offsetHeight;
+      document.documentElement.style.setProperty('--announcement-h', `${height}px`);
+    } else {
+      document.documentElement.style.setProperty('--announcement-h', '0px');
+    }
+
+    return () => {
+      document.documentElement.style.setProperty('--announcement-h', '0px');
+    };
+  }, [activeBanner]);
+
+  const handleDismissBanner = () => {
+    setActiveBanner(null);
+    document.documentElement.style.setProperty('--announcement-h', '0px');
+  };
 
   const navLinks = [
     { label: 'Inicio', path: '/' },
@@ -35,9 +100,43 @@ export const Header: React.FC = () => {
   return (
     <>
       <header className={`header ${isStuck ? 'is-stuck' : ''}`}>
+        {/* Aviso prioritario superior dinámico */}
+        {activeBanner && activeBanner.active && (
+          <div
+            ref={bannerRef}
+            className={`announcement-bar announcement-bar--${activeBanner.level || 'info'}`}
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="wrap announcement-bar__inner">
+              <div className="announcement-bar__content">
+                <Megaphone size={16} color="var(--gold)" style={{ flexShrink: 0 }} />
+                <span className="announcement-bar__text">
+                  <strong>{activeBanner.title}:</strong> {activeBanner.message}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="announcement-bar__close"
+                onClick={handleDismissBanner}
+                aria-label="Cerrar aviso prioritario"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="wrap header__inner">
           <Link to="/" className="brand" aria-label="Club de Ajedrez Capablanca Sabaneta, ir al inicio">
-            <img className="brand__logo" src="/assets/img/logo-capablanca.png" alt="" width="50" height="50" />
+            <img
+              className="brand__logo"
+              src="/assets/img/logo-capablanca.png"
+              alt="Club Capablanca Sabaneta"
+              onError={handleImageError}
+              width="50"
+              height="50"
+            />
             <span className="brand__text">
               <span className="brand__name">Capablanca</span>
               <span className="brand__sub">Sabaneta</span>

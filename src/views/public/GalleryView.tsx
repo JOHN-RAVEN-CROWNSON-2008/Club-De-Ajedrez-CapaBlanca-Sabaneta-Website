@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_GALLERY } from '../../lib/initialData';
 import { GalleryItem } from '../../types/database';
+import { normalizeImageUrl, handleImageError } from '../../lib/imageUtils';
 import { Image as ImageIcon, ZoomIn, X, ChevronLeft, ChevronRight, Search, MessageCircle, ExternalLink } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -113,13 +114,10 @@ export const GalleryView: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedImage, handlePrev, handleNext]);
 
-  const resolveImageSrc = (src: string) => {
-    if (!src) return '/assets/img/logo-capablanca.png';
-    return src.startsWith('/') || src.startsWith('http') ? src : `/${src}`;
-  };
+  const resolveImageSrc = (src: string) => normalizeImageUrl(src);
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
+    <div style={{ paddingTop: 'var(--content-offset)' }}>
       {/* Cabecera */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3rem' }}>
         <div className="wrap-narrow">
@@ -300,6 +298,7 @@ export const GalleryView: React.FC = () => {
                   <img
                     src={resolveImageSrc(item.src)}
                     alt={item.alt}
+                    onError={handleImageError}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
                   />
                   <div
@@ -464,6 +463,7 @@ export const GalleryView: React.FC = () => {
             <img
               src={resolveImageSrc(selectedImage.src)}
               alt={selectedImage.alt}
+              onError={handleImageError}
               style={{
                 maxWidth: '100%',
                 maxHeight: '76vh',

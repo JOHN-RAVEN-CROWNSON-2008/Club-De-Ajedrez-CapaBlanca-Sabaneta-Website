@@ -26,7 +26,7 @@ export const ForgotPasswordView: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 3rem)', minHeight: '85vh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: '1rem' }}>
+    <div style={{ paddingTop: 'calc(var(--content-offset) + 1.5rem)', minHeight: '85vh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: '1rem' }}>
       <div style={{ maxWidth: '440px', width: '100%', background: '#141414', border: '1px solid #282828', borderRadius: '16px', padding: '2.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <h1 className="display display--gold" style={{ fontSize: '1.6rem' }}>Recuperar Contraseña</h1>

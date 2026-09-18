@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_POSTS } from '../../lib/initialData';
 import { Post } from '../../types/database';
+import { normalizeImageUrl, handleImageError } from '../../lib/imageUtils';
 import { Calendar, ArrowRight, BookOpen, Search } from 'lucide-react';
 
 export const BlogView: React.FC = () => {
@@ -65,7 +66,7 @@ export const BlogView: React.FC = () => {
   }, [posts, categoryFilter, searchQuery]);
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
+    <div style={{ paddingTop: 'var(--content-offset)' }}>
       {/* Cabecera */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3rem' }}>
         <div className="wrap-narrow">
@@ -225,8 +226,9 @@ export const BlogView: React.FC = () => {
                 >
                   <div style={{ height: '220px', overflow: 'hidden' }}>
                     <img
-                      src={post.cover_image}
+                      src={normalizeImageUrl(post.cover_image)}
                       alt={post.title}
+                      onError={handleImageError}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
                     />
                   </div>

@@ -185,7 +185,7 @@ export const VerifyCertificateView: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)', paddingBottom: '5rem', background: '#0a0a0a', color: '#fff', minHeight: '100vh' }}>
+    <div style={{ paddingTop: 'var(--content-offset)', paddingBottom: '5rem', background: '#0a0a0a', color: '#fff', minHeight: '100vh' }}>
       <div className="wrap" style={{ maxWidth: '850px', margin: '0 auto' }}>
         
         {/* Cabecera */}

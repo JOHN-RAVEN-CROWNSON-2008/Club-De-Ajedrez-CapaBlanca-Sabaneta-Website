@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { handleImageError } from '../../lib/imageUtils';
 
 const SLIDES = [
   { src: '/assets/img/club-galeria-04.webp', alt: 'Alumnos y entrenadores del club reunidos frente al mural de ajedrez' },
@@ -82,7 +83,7 @@ export const HeroSlider: React.FC = () => {
               inset: 0,
             }}
           >
-            <img src={slide.src} alt={slide.alt} width="1440" height="1440" />
+            <img src={slide.src} alt={slide.alt} onError={handleImageError} width="1440" height="1440" />
           </div>
         ))}
       </div>
@@ -102,6 +103,7 @@ export const HeroSlider: React.FC = () => {
           className="hero__badge"
           src="/assets/img/logo-capablanca.png"
           alt="Escudo del Club Escuela de Ajedrez Capablanca"
+          onError={handleImageError}
           width="186"
           height="192"
         />

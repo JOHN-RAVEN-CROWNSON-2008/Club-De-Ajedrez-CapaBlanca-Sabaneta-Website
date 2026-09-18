@@ -56,7 +56,7 @@ export const ContactView: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
+    <div style={{ paddingTop: 'var(--content-offset)' }}>
       {/* Cabecera */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3rem' }}>
         <div className="wrap-narrow">
@@ -274,6 +274,77 @@ export const ContactView: React.FC = () => {
             </div>
           </div>
 
+        </div>
+      </section>
+
+      {/* Sección Mapa Interactivo y Ubicación Oficial en Sabaneta */}
+      <section className="section section--dark" style={{ borderTop: '1px solid #222', paddingBlock: '4rem' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="pill pill--gold">Cómo llegar</span>
+            <h2 className="display display--gold" style={{ fontSize: 'var(--step-3)', marginTop: '0.8rem' }}>
+              Nuestra sede en Sabaneta
+            </h2>
+            <p style={{ color: '#aaa', fontSize: '1.1rem', marginTop: '0.6rem', maxWidth: '680px', marginInline: 'auto' }}>
+              Centro Comercial Aves María, tercer piso. A pocos minutos del parque principal y con acceso fácil en Metro y rutas integradas.
+            </p>
+          </div>
+
+          <div className="map" style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden', border: '3px solid var(--gold)', background: '#111', boxShadow: 'var(--shadow-lg)' }}>
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d294.8388272528983!2d-75.61803483888748!3d6.149147616430133!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e4683de5c52fae7%3A0x48c5e1c8db55276c!2sAves%20Mar%C3%ADa%20Parque%20Comercial%20P.%20H!5e0!3m2!1ses!2sco!4v1789078462103!5m2!1ses!2sco"
+              title="Ubicación del Club de Ajedrez Capablanca Sabaneta en el Parque Comercial Aves María"
+              style={{ display: 'block', width: '100%', height: 'clamp(320px, 45vw, 480px)', border: 0, filter: 'grayscale(0.2) contrast(1.05)' }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+            <div
+              className="map__pin"
+              style={{
+                position: 'absolute',
+                zIndex: 2,
+                left: '1rem',
+                bottom: '1rem',
+                background: 'var(--ink, #000)',
+                color: '#fff',
+                borderRadius: '12px',
+                padding: '0.85rem 1.2rem',
+                boxShadow: 'var(--shadow-md)',
+                borderLeft: '5px solid var(--gold)',
+                maxWidth: 'min(88%, 340px)',
+              }}
+            >
+              <strong style={{ display: 'block', fontFamily: 'var(--ff-display)', textTransform: 'uppercase', fontSize: '0.95rem', color: 'var(--gold)' }}>
+                Club Capablanca Sabaneta
+              </strong>
+              <span style={{ fontSize: '0.84rem', color: '#CFCFCF' }}>
+                CC Aves María, tercer piso · Sabaneta, Antioquia
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '2rem' }}>
+            <a
+              className="btn btn--primary"
+              href="https://www.google.com/maps/search/?api=1&query=Centro+Comercial+Aves+Maria+Sabaneta+Antioquia"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <MapPin size={18} />
+              <span>Abrir en Google Maps</span>
+            </a>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => whatsappService.openChat('Hola, necesito indicaciones para llegar a la sede del Club Capablanca en CC Aves María.')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderColor: 'var(--gold)' }}
+            >
+              <MessageCircle size={18} />
+              <span>Pedir indicaciones por WhatsApp</span>
+            </button>
+          </div>
         </div>
       </section>
     </div>

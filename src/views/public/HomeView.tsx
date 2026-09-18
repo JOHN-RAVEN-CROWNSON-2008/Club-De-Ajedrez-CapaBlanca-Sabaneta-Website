@@ -8,14 +8,12 @@ import { DailyTacticalPuzzle } from '../../components/common/DailyTacticalPuzzle
 import { INITIAL_EVENTS, INITIAL_POSTS, INITIAL_ANNOUNCEMENTS } from '../../lib/initialData';
 import { ClubAnnouncement, ClubEvent, Post } from '../../types/database';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle, Megaphone, X } from 'lucide-react';
+import { normalizeImageUrl, handleImageError } from '../../lib/imageUtils';
+import { Calendar, Clock, MapPin, Trophy, ArrowRight, BookOpen, CheckCircle, HelpCircle } from 'lucide-react';
 
 export const HomeView: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<ClubEvent[]>(INITIAL_EVENTS.slice(0, 2));
   const [latestPosts, setLatestPosts] = useState<Post[]>(INITIAL_POSTS.slice(0, 2));
-  const [activeBanner, setActiveBanner] = useState<ClubAnnouncement | null>(
-    INITIAL_ANNOUNCEMENTS.find((a) => a.active && (a.target === 'all' || a.target === 'public')) || null
-  );
 
   useEffect(() => {
     async function loadHomeData() {
@@ -35,15 +33,6 @@ export const HomeView: React.FC = () => {
           .order('created_at', { ascending: false })
           .limit(2);
         if (postData && postData.length > 0) setLatestPosts(postData as Post[]);
-
-        const { data: annData } = await supabase
-          .from('club_announcements')
-          .select('*')
-          .eq('active', true)
-          .in('target', ['all', 'public'])
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (annData && annData.length > 0) setActiveBanner(annData[0] as ClubAnnouncement);
       } catch (err) {
         console.warn('Carga dinámica en HomeView:', err);
       }
@@ -73,42 +62,8 @@ export const HomeView: React.FC = () => {
 
   return (
     <div>
-      {/* Banner de Anuncio Prioritario si está activo */}
-      {activeBanner && activeBanner.active && (
-        <div
-          style={{
-            background: activeBanner.level === 'urgent' ? '#b71c1c' : activeBanner.level === 'warning' ? '#e65100' : '#141414',
-            borderBottom: '2px solid var(--gold)',
-            color: '#fff',
-            padding: '0.65rem 1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.9rem',
-            position: 'relative',
-            zIndex: 100,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', margin: '0 auto' }}>
-            <Megaphone size={18} color="var(--gold)" />
-            <span>
-              <strong>{activeBanner.title}:</strong> {activeBanner.message}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActiveBanner(null)}
-            style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0.2rem' }}
-            aria-label="Cerrar aviso"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
       {/* 1. Hero con Slider y ADN */}
       <HeroSlider />
-
 
       {/* 2. Ticker animado */}
       <Ticker />
@@ -123,6 +78,7 @@ export const HomeView: React.FC = () => {
             <img
               src="/assets/img/club-galeria-04.webp"
               alt="Alumnos y entrenadores del Club Capablanca Sabaneta"
+              onError={handleImageError}
               style={{ width: '100%', height: 'auto', display: 'block' }}
             />
             <div
@@ -339,8 +295,9 @@ export const HomeView: React.FC = () => {
               >
                 <div style={{ height: '200px', overflow: 'hidden' }}>
                   <img
-                    src={post.cover_image}
+                    src={normalizeImageUrl(post.cover_image)}
                     alt={post.title}
+                    onError={handleImageError}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>

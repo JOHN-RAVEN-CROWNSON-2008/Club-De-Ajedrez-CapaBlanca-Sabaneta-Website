@@ -1,0 +1,51 @@
+﻿name: Auditoria Continua del Sistema - Club Capablanca
+
+on:
+  schedule:
+    # Ejecuta una auditoria completa cada 6 horas
+    - cron: '0 */6 * * *'
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Auditoria de Codigo, Tipos, Assets y Compilacion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependencias limpias
+        run: npm ci
+
+      - name: Verificacion de tipos TypeScript (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Verificacion de integridad de imagenes y assets
+        run: |
+          echo "=== Verificando que public/assets/img contenga las imagenes requeridas ==="
+          test -f public/assets/img/logo-capablanca.png || exit 1
+          test -f public/assets/img/club-galeria-04.webp || exit 1
+          test -f public/assets/img/campeon-sub8.webp || exit 1
+          test -f public/assets/img/delegacion-escalinatas.webp || exit 1
+          echo "Assets publicos verificados correctamente."
+
+      - name: Compilacion de produccion (Vite build)
+        run: npm run build
+
+      - name: Confirmacion de salida en dist/
+        run: |
+          test -f dist/index.html || exit 1
+          test -d dist/assets/img || exit 1
+          echo "Build de produccion completado exitosamente sin errores."

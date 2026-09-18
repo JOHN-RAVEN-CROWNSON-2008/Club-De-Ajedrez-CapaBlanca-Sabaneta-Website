@@ -1,6 +1,7 @@
 import React from 'react';
 import { Instagram, ExternalLink } from 'lucide-react';
 import { INITIAL_GALLERY } from '../../lib/initialData';
+import { normalizeImageUrl, handleImageError } from '../../lib/imageUtils';
 
 export const InstagramWall: React.FC = () => {
   const posts = INITIAL_GALLERY.slice(0, 6);
@@ -53,8 +54,9 @@ export const InstagramWall: React.FC = () => {
             >
               <div style={{ aspectRatio: '1/1', overflow: 'hidden', position: 'relative' }}>
                 <img
-                  src={post.src}
+                  src={normalizeImageUrl(post.src)}
                   alt={post.alt}
+                  onError={handleImageError}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
                 />
                 <div

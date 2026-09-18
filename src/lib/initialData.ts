@@ -91,7 +91,7 @@ Anotar no es un trámite: es tu diario de aprendizaje. Cada partida anotada te p
 
 ### 3. La actitud deportiva
 En el ajedrez no se pierde: se gana o se aprende. El saludo inicial con la mano y la felicitación al rival al concluir son sellos irrenunciables de los deportistas de la familia Capablanca.`,
-    cover_image: 'assets/img/club-galeria-04.webp',
+    cover_image: '/assets/img/club-galeria-04.webp',
     category: 'Formativo',
     published: true,
     published_at: '2026-09-02T12:00:00Z',
@@ -105,7 +105,7 @@ En el ajedrez no se pierde: se gana o se aprende. El saludo inicial con la mano 
     content: `Con una destacada participación de más de 20 deportistas, el Club de Ajedrez Capablanca Sabaneta demostró el fruto del entrenamiento constante. En el marco del campeonato regional disputado este fin de semana, nuestros alumnos obtuvieron primeros puestos en categorías Sub-8 y Sub-12.
 
 Felicitamos a todos los alumnos, familias y al cuerpo técnico del club por su acompañamiento permanente. ¡Seguimos formando campeones dentro y fuera del tablero!`,
-    cover_image: 'assets/img/equipo-infantil-trofeos.webp',
+    cover_image: '/assets/img/equipo-infantil-trofeos.webp',
     category: 'Torneos',
     published: true,
     published_at: '2026-09-08T12:00:00Z',
@@ -117,7 +117,7 @@ Felicitamos a todos los alumnos, familias y al cuerpo técnico del club por su a
     slug: 'valor-formativo-ajedrez-infancia',
     excerpt: 'Más allá del tablero: cómo el ajedrez fortalece la toma de decisiones, la concentración y la disciplina cotidiana.',
     content: `Aprender ajedrez en edades tempranas estimula la capacidad analítica, enseña a prever consecuencias antes de actuar y forja la paciencia. En nuestro club concebimos el deporte como una herramienta de formación integral para la vida.`,
-    cover_image: 'assets/img/ninos-celebrando.webp',
+    cover_image: '/assets/img/ninos-celebrando.webp',
     category: 'Educación',
     published: true,
     published_at: '2026-09-12T12:00:00Z',
@@ -177,18 +177,18 @@ export const INITIAL_DOCUMENTS: ClubDocument[] = [
 ];
 
 export const INITIAL_GALLERY: GalleryItem[] = [
-  { id: 'g-1', src: 'assets/img/equipo-infantil-trofeos.webp', alt: 'Categoría infantil del Club Capablanca Sabaneta posando con sus trofeos tras una premiación', caption: 'Premiación categoría infantil', category: 'infantil', order_index: 1 },
-  { id: 'g-2', src: 'assets/img/delegacion-escalinatas.webp', alt: 'Delegación completa del club con familias y entrenadores en las escalinatas antes de un torneo', caption: 'Delegación completa', category: 'delegacion', order_index: 2 },
-  { id: 'g-3', src: 'assets/img/campeon-sub8.webp', alt: 'Alumnos y entrenadores celebrando con el trofeo de Campeón Sub-8 y un reloj de ajedrez', caption: 'Campeón Sub-8', category: 'torneos', order_index: 3 },
-  { id: 'g-4', src: 'assets/img/equipo-adultos-torneo.webp', alt: 'Equipo de adultos del club con el uniforme oficial durante un torneo abierto', caption: 'Equipo de adultos en competencia', category: 'adultos', order_index: 4 },
-  { id: 'g-5', src: 'assets/img/delegacion-coliseo.webp', alt: 'Deportistas del club en el coliseo durante una jornada nocturna de torneo', caption: 'Noche de torneo', category: 'torneos', order_index: 5 },
-  { id: 'g-6', src: 'assets/img/ninos-celebrando.webp', alt: 'Niños del club celebrando con las manos en alto en la calle', caption: 'La familia Capablanca', category: 'comunidad', order_index: 6 },
-  { id: 'g-7', src: 'assets/img/premiacion-aves-maria.webp', alt: 'Jugadores del club en la premiación de un torneo en el Parque Comercial Aves María', caption: 'Torneo en Aves María', category: 'torneos', order_index: 7 },
-  { id: 'g-8', src: 'assets/img/club-galeria-04.webp', alt: 'Delegación del club frente al mural de ajedrez de la sede', caption: 'En nuestra sede', category: 'sede', order_index: 8 },
-  { id: 'g-9', src: 'assets/img/entrenadores-alumno.webp', alt: 'Dos entrenadores del club acompañando a un alumno que sostiene su trofeo', caption: 'Acompañamiento personalizado', category: 'entrenamiento', order_index: 9 },
-  { id: 'g-10', src: 'assets/img/seleccion-colombia.webp', alt: 'Selección Colombia de ajedrez ante las banderas de los países participantes', caption: 'Ajedrez colombiano', category: 'competencia', order_index: 10 },
-  { id: 'g-11', src: 'assets/img/flyer-inscripciones.webp', alt: 'Pieza gráfica oficial del club anunciando inscripciones abiertas', caption: 'Inscripciones abiertas', category: 'anuncios', order_index: 11 },
-  { id: 'g-12', src: 'assets/img/logo-capablanca.png', alt: 'Escudo circular del Club Escuela de Ajedrez Capablanca', caption: 'Nuestro escudo oficial', category: 'identidad', order_index: 12 }
+  { id: 'g-1', src: '/assets/img/equipo-infantil-trofeos.webp', alt: 'Categoría infantil del Club Capablanca Sabaneta posando con sus trofeos tras una premiación', caption: 'Premiación categoría infantil', category: 'infantil', order_index: 1 },
+  { id: 'g-2', src: '/assets/img/delegacion-escalinatas.webp', alt: 'Delegación completa del club con familias y entrenadores en las escalinatas antes de un torneo', caption: 'Delegación completa', category: 'delegacion', order_index: 2 },
+  { id: 'g-3', src: '/assets/img/campeon-sub8.webp', alt: 'Alumnos y entrenadores celebrando con el trofeo de Campeón Sub-8 y un reloj de ajedrez', caption: 'Campeón Sub-8', category: 'torneos', order_index: 3 },
+  { id: 'g-4', src: '/assets/img/equipo-adultos-torneo.webp', alt: 'Equipo de adultos del club con el uniforme oficial durante un torneo abierto', caption: 'Equipo de adultos en competencia', category: 'adultos', order_index: 4 },
+  { id: 'g-5', src: '/assets/img/delegacion-coliseo.webp', alt: 'Deportistas del club en el coliseo durante una jornada nocturna de torneo', caption: 'Noche de torneo', category: 'torneos', order_index: 5 },
+  { id: 'g-6', src: '/assets/img/ninos-celebrando.webp', alt: 'Niños del club celebrando con las manos en alto en la calle', caption: 'La familia Capablanca', category: 'comunidad', order_index: 6 },
+  { id: 'g-7', src: '/assets/img/premiacion-aves-maria.webp', alt: 'Jugadores del club en la premiación de un torneo en el Parque Comercial Aves María', caption: 'Torneo en Aves María', category: 'torneos', order_index: 7 },
+  { id: 'g-8', src: '/assets/img/club-galeria-04.webp', alt: 'Delegación del club frente al mural de ajedrez de la sede', caption: 'En nuestra sede', category: 'sede', order_index: 8 },
+  { id: 'g-9', src: '/assets/img/entrenadores-alumno.webp', alt: 'Dos entrenadores del club acompañando a un alumno que sostiene su trofeo', caption: 'Acompañamiento personalizado', category: 'entrenamiento', order_index: 9 },
+  { id: 'g-10', src: '/assets/img/seleccion-colombia.webp', alt: 'Selección Colombia de ajedrez ante las banderas de los países participantes', caption: 'Ajedrez colombiano', category: 'competencia', order_index: 10 },
+  { id: 'g-11', src: '/assets/img/flyer-inscripciones.webp', alt: 'Pieza gráfica oficial del club anunciando inscripciones abiertas', caption: 'Inscripciones abiertas', category: 'anuncios', order_index: 11 },
+  { id: 'g-12', src: '/assets/img/logo-capablanca.png', alt: 'Escudo circular del Club Escuela de Ajedrez Capablanca', caption: 'Nuestro escudo oficial', category: 'identidad', order_index: 12 }
 ];
 
 export const INITIAL_SCHEDULES: ClassSchedule[] = [

@@ -233,7 +233,7 @@ export const ChessClockView: React.FC = () => {
         color: '#fff',
         display: 'flex',
         flexDirection: 'column',
-        paddingTop: isFullScreen ? '0' : 'calc(var(--header-h) + 1rem)',
+        paddingTop: isFullScreen ? '0' : 'var(--content-offset)',
         userSelect: 'none',
       }}
     >

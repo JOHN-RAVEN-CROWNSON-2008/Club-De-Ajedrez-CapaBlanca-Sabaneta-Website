@@ -54,7 +54,7 @@ export const MemberLoginView: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 3rem)', minHeight: '90vh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: '1rem' }}>
+    <div style={{ paddingTop: 'calc(var(--content-offset) + 1.5rem)', minHeight: '90vh', background: '#0a0a0a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingInline: '1rem' }}>
       <div style={{ maxWidth: '440px', width: '100%', background: '#141414', border: '1px solid #282828', borderRadius: '16px', padding: '2.5rem', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img src="/assets/img/logo-capablanca.png" alt="Logo Capablanca" width="64" height="64" style={{ margin: '0 auto 1rem' }} />

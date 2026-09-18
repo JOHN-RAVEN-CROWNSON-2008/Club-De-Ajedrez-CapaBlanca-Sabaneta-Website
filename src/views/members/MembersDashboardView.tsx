@@ -265,7 +265,7 @@ export const MembersDashboardView: React.FC = () => {
   });
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 1.5rem)', background: '#0a0a0a', color: '#fff', minHeight: '100vh' }}>
+    <div style={{ paddingTop: 'var(--content-offset)', background: '#0a0a0a', color: '#fff', minHeight: '100vh' }}>
       
       {/* Barra superior de Afiliado */}
       <div style={{ background: '#141414', borderBottom: '1px solid #252525', padding: '1.2rem 0' }}>

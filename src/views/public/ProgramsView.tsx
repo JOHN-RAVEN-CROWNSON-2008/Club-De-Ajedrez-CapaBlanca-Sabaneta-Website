@@ -101,7 +101,7 @@ export const ProgramsView: React.FC = () => {
   ];
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
+    <div style={{ paddingTop: 'var(--content-offset)' }}>
       {/* Cabecera */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3rem' }}>
         <div className="wrap-narrow">

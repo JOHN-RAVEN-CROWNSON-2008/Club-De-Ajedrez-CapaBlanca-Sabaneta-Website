@@ -153,7 +153,7 @@ export const MembershipApplicationView: React.FC = () => {
   };
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 1.5rem)', paddingBottom: '4rem', background: '#f8fafc', minHeight: '100vh' }}>
+    <div style={{ paddingTop: 'var(--content-offset)', paddingBottom: '4rem', background: '#f8fafc', minHeight: '100vh' }}>
       
       {/* Cabecera Principal */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3.5rem 2.5rem', borderBottom: '1px solid #333' }}>

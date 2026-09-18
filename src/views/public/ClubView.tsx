@@ -4,6 +4,7 @@ import { Shield, Target, Award, Heart, CheckCircle2, Trophy, ExternalLink, Medal
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { INITIAL_MEMBERS, INITIAL_TROPHIES } from '../../lib/initialData';
 import { UserProfile, MemberPublicDirectoryItem, ClubTrophy } from '../../types/database';
+import { handleImageError } from '../../lib/imageUtils';
 
 export const ClubView: React.FC = () => {
   const [members, setMembers] = useState<(UserProfile | MemberPublicDirectoryItem)[]>(INITIAL_MEMBERS);
@@ -136,7 +137,7 @@ export const ClubView: React.FC = () => {
   }, [trophies, trophyYearFilter, trophySearch]);
 
   return (
-    <div style={{ paddingTop: 'calc(var(--header-h) + 2rem)' }}>
+    <div style={{ paddingTop: 'var(--content-offset)' }}>
       {/* Cabecera de Sección */}
       <section className="section section--dark" style={{ textAlign: 'center', paddingBlock: '3rem' }}>
         <div className="wrap-narrow">
@@ -185,6 +186,7 @@ export const ClubView: React.FC = () => {
             <img
               src="/assets/img/delegacion-escalinatas.webp"
               alt="Delegación completa del club con familias y entrenadores"
+              onError={handleImageError}
               style={{ width: '100%', height: 'auto', display: 'block' }}
             />
           </div>
